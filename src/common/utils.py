@@ -1,11 +1,7 @@
-"""
-Common utilities shared across DS and DE modules.
-"""
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     """
@@ -30,7 +26,6 @@ def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         logger.addHandler(handler)
 
     return logger
-
 
 def get_timestamp(format: str = "%Y%m%d_%H%M%S") -> str:
     """

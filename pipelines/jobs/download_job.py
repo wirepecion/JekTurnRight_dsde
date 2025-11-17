@@ -10,19 +10,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class DownloadJob:
-    """
-    A job for downloading files with skip-if-exists functionality.
-    """
-
     def __init__(self, download_dir: str = "data/raw"):
-        """
-        Initialize the download job.
-
-        Args:
-            download_dir: Directory to save downloaded files
-        """
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
@@ -33,18 +22,7 @@ class DownloadJob:
         skip_if_exists: bool = True,
         chunk_size: int = 8192
     ) -> Optional[Path]:
-        """
-        Download a file from a URL.
 
-        Args:
-            url: URL to download from
-            filename: Optional filename to save as (defaults to URL filename)
-            skip_if_exists: Skip download if file already exists
-            chunk_size: Size of chunks for streaming download
-
-        Returns:
-            Path to downloaded file, or None if download failed
-        """
         # Determine filename
         if filename is None:
             filename = url.split("/")[-1]
@@ -81,7 +59,7 @@ class DownloadJob:
 
         except requests.RequestException as e:
             logger.error(f"Error downloading {url}: {e}")
-            # Clean up partial download
+
             if filepath.exists():
                 filepath.unlink()
             return None
@@ -91,16 +69,7 @@ class DownloadJob:
         urls: list[str],
         skip_if_exists: bool = True
     ) -> list[Optional[Path]]:
-        """
-        Download multiple files.
 
-        Args:
-            urls: List of URLs to download
-            skip_if_exists: Skip download if files already exist
-
-        Returns:
-            List of paths to downloaded files (None for failed downloads)
-        """
         results = []
         for url in urls:
             result = self.download_file(url, skip_if_exists=skip_if_exists)
@@ -109,9 +78,6 @@ class DownloadJob:
 
 
 def example_download():
-    """
-    Example usage of the DownloadJob class.
-    """
     job = DownloadJob("data/raw")
     
     # Example: Download a sample CSV file
