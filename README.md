@@ -2,6 +2,15 @@
 
 A Data Science and Data Engineering repository using `uv` for package management with a `src/` layout.
 
+## Make Ikernel
+```bash
+uv venv .venv
+source .venv/bin/activate          # or .venv\Scripts\activate on Windows
+uv pip install -e .
+uv pip install ipykernel
+python -m ipykernel install --user --name traffy-dsde
+```
+
 ## Project Structure
 
 ```
