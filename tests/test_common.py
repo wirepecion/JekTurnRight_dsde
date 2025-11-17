@@ -8,7 +8,7 @@ import sys
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from common.utils import get_timestamp, ensure_dir
+from src.common.utils import get_timestamp, ensure_dir
 
 
 def test_get_timestamp():

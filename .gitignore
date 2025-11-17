@@ -214,3 +214,6 @@ data/processed/*
 
 # vscode
 .vscode
+
+# Spark
+spark_tmp/

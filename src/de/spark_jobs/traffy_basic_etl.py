@@ -1,33 +1,34 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col,
-    expr,
-    lower,
-    regexp_replace,
-    to_timestamp,
-)
 from pathlib import Path
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, expr, lower, regexp_replace
 
-# from src.common.config import RAW_DIR, PROCESSED_DIR
+from src.common.config import RAW_DIR, PROCESSED_DIR
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# RAW_FILE = Path(RAW_DIR) / "bangkok_traffy.csv"
-# OUTPUT_DIR = Path(PROCESSED_DIR) / "traffy_cleaned_parquet"
+SPARK_LOCAL_DIR = PROJECT_ROOT / "spark_tmp"
+SPARK_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+
+WAREHOUSE_DIR = PROJECT_ROOT / "spark_warehouse"
+WAREHOUSE_DIR.mkdir(parents=True, exist_ok=True)
+
+RAW_FILE = RAW_DIR / "bangkok_traffy.csv"
+OUTPUT_DIR = PROCESSED_DIR / "traffy_cleaned_parquet"
+OUTPUT_DIR.parent.mkdir(parents=True, exist_ok=True)
 
 
 def build_spark():
-    """
-    Create and configure SparkSession.
-    For now we keep it simple and local.
-    """
     spark = (
         SparkSession.builder
         .appName("TraffyBasicETL")
         .config("spark.sql.ansi.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "8")  # tweak if needed
+        .config("spark.sql.shuffle.partitions", "8")
+        .config("spark.local.dir", str(SPARK_LOCAL_DIR))
+        .config("spark.sql.warehouse.dir", str(WAREHOUSE_DIR))
         .getOrCreate()
     )
     return spark
+
 
 
 def standardize_column_names(df):
@@ -141,7 +142,7 @@ def main():
     df = (
         spark.read
         .option("header", True)
-        .option("inferSchema", True)
+        # .option("inferSchema", True)
         .csv(str(RAW_FILE))
     )
 
