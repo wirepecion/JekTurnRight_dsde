@@ -2,7 +2,7 @@ from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, expr, lower, regexp_replace
 
-from src.common.config import RAW_DIR, PROCESSED_DIR
+from common.config import RAW_DIR, PROCESSED_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
