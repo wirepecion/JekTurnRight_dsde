@@ -75,7 +75,7 @@ def clean_type_columns(df: pd.DataFrame, explode: bool = False) -> pd.DataFrame:
 
     if(explode):
         df['type_list'] = df['type'].apply(parse_type_string) 
-        df = df.explode['type_list']
+        df = df.explode('type_list')
     
     return df
 #--------------------------------------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ def verify_geopandas(shape:gpd.GeoDataFrame,check_df:pd.DataFrame=None) -> gpd.G
     shape_ = gdf of .shp ,that want to check
     check_df = df that contain true subdistrict and district
     '''
-    if(check_df):
+    if(check_df is not None):
         # แก้ชื่อ subdistrict
         shape = check_subdistrict(shape,check_df)
         # แก้ชื่อ district
@@ -172,7 +172,7 @@ def parse_type_string(text):
     cleaned_items = [item.strip() for item in items if item.strip()]
     return cleaned_items
 
-def get_heat_map(df: pd.DataFrame, shape: gpd.GeoDataFrame, drop_missed_value: bool = False) -> pd.DataFrame:
+def get_heat_map(df: pd.DataFrame, shape: gpd.GeoDataFrame, drop_missed_value: bool = False):
     
     map_df_col  = 'subdistrict'
     map_BMA_col = 'SUBDISTR_1'

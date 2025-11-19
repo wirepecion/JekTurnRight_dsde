@@ -31,11 +31,15 @@ def _detect_project_root() -> Path:
 
 
 PROJECT_ROOT: Path = _detect_project_root()
+
 DATA_DIR: Path = PROJECT_ROOT / "data"
+
 RAW_DIR: Path = DATA_DIR / "raw"
 PROCESSED_DIR: Path = DATA_DIR / "processed"
-INTERIM_DIR: Path = DATA_DIR / "interim"
 OUTPUT_DIR: Path = DATA_DIR / "output"
+
+CLEANED_TRAFFY_PATH: Path = PROCESSED_DIR / "traffy_clean.parquet"
+FLOOD_TS_PATH: Path = PROCESSED_DIR / "flood_daily_by_district.parquet"
 
 
 def ensure_dirs() -> None:
@@ -43,5 +47,5 @@ def ensure_dirs() -> None:
     Create standard data dirs if they don't exist yet.
     Safe to call multiple times.
     """
-    for d in [DATA_DIR, RAW_DIR, PROCESSED_DIR, INTERIM_DIR, OUTPUT_DIR]:
+    for d in [DATA_DIR, RAW_DIR, PROCESSED_DIR, OUTPUT_DIR, CLEANED_TRAFFY_PATH, FLOOD_TS_PATH]:
         d.mkdir(parents=True, exist_ok=True)
