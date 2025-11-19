@@ -47,7 +47,7 @@ def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
     #Create new timestamp's year month and date columns
     df['year_timestamp'] = df['timestamp'].dt.year
     df['month_timestamp'] = df['timestamp'].dt.month
-    df['days_timestamp'] = df['timestamp'].dt.days_in_month
+    df['days_timestamp'] = df['timestamp'].dt.day
 
     #Extract longitude and latitude from 'coords' column
     df[['longitude', 'latitude']] = df['coords'].str.split(',', expand=True).astype(float)
