@@ -1,3 +1,3 @@
-__all__ = ['src', 'test']
+__all__ = ['src', 'tests']
 from . import src
-from . import test
+from . import tests

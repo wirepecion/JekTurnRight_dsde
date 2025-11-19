@@ -1,0 +1,88 @@
+.
+├── README.md
+├── __init__.py
+├── data
+│   ├── external
+│   │   ├── rain_water_merged_2022_to_2024.csv
+│   │   └── station_metadata.csv
+│   ├── processed
+│   │   ├── flood_daily_by_district.parquet
+│   │   │   ├── _SUCCESS
+│   │   │   └── part-00000-c223f33e-0a6e-4a30-bd32-b03ae0f83d44-c000.snappy.parquet
+│   │   └── traffy_clean.parquet
+│   │       ├── _SUCCESS
+│   │       └── part-00000-83fea1ae-2dbd-46ea-8de2-6ec6f5160ce7-c000.snappy.parquet
+│   └── raw
+│       └── bangkok_traffy.csv
+├── directory_tree.txt
+├── notebooks
+│   ├── example_analysis.ipynb
+│   └── insight.ipynb
+├── pipelines
+│   └── jobs
+│       ├── download_raw_data.py
+│       └── traffy_flood_etl.py
+├── pyproject.toml
+├── requirements.txt
+├── src
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   └── __init__.cpython-310.pyc
+│   ├── common
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── config.cpython-310.pyc
+│   │   │   └── utils.cpython-310.pyc
+│   │   ├── config.py
+│   │   ├── dataprep.py
+│   │   ├── insight.py
+│   │   └── utils.py
+│   ├── de
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   └── __init__.cpython-310.pyc
+│   │   ├── extract
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   └── __init__.cpython-310.pyc
+│   │   │   └── web_scraper
+│   │   │       ├── README.md
+│   │   │       ├── __init__.py
+│   │   │       ├── __pycache__
+│   │   │       │   ├── __init__.cpython-310.pyc
+│   │   │       │   └── scraper.cpython-310.pyc
+│   │   │       ├── scraper.py
+│   │   │       ├── station_name_scraping.py
+│   │   │       └── water_level_scraping.py
+│   │   ├── load
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   └── loader.cpython-310.pyc
+│   │   │   └── loader.py
+│   │   ├── spark_jobs
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── etl_example.cpython-310.pyc
+│   │   │   │   └── traffy_flood_etl.cpython-310.pyc
+│   │   │   └── traffy_flood_etl.py
+│   │   └── transform
+│   │       ├── __init__.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-310.pyc
+│   │       │   └── transformers.cpython-310.pyc
+│   │       └── transformers.py
+│   └── ds
+│       ├── __init__.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-310.pyc
+│       │   └── analyzer.cpython-310.pyc
+│       └── analyzer.py
+├── tests
+│   ├── __init__.py
+│   └── test_common.py
+└── uv.lock
+
+28 directories, 57 files

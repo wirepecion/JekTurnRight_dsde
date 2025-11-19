@@ -1,3 +1,2 @@
-__all__ = ['etl_example', 'traffy_flood_etl']
-from . import etl_example
+__all__ = ['traffy_flood_etl']
 from . import traffy_flood_etl
