@@ -21,10 +21,15 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = add_crucial_cols(df)        #Add crucial columns
     df = drop_not_used_columns(df,cols = ['photo', 'photo_after', 'star'])
     df = filter_year(df,start=2022,stop=2024)
-    df = drop_not_use_province()
+    df = drop_not_use_province(df)
     shape_gdf =get_shape_file(shape_path)
-    check_df = get_raw_data(csv_to_check_shape_path)
-    df = verify_coordination_with_address(df=df,verify_df=shape_gdf,check=check_df)
+
+    if(csv_to_check_shape_path):
+        check_df = get_raw_data(csv_to_check_shape_path)
+        df = verify_coordination_with_address(df=df,verify_df=shape_gdf,check=check_df)
+    else:
+        df = verify_coordination_with_address(df=df,verify_df=shape_gdf)
+
     df = clean_type_columns(df)      #Clean 'type' column
 
     return df
@@ -52,7 +57,7 @@ def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
 def drop_nan_rows(df: pd.DataFrame) -> pd.DataFrame:
 
     #Drop row which contain nan value 
-    cols = ['ticket_id', 'type', 'organization', 'coords', 'timestamp', 'last_activity']
+    cols = ['ticket_id', 'type', 'organization', 'coords', 'province', 'timestamp', 'last_activity']
     df = df.dropna(subset=cols, inplace=False)
     
     return df
@@ -86,7 +91,7 @@ def verify_geopandas(shape:gpd.GeoDataFrame,check_df:pd.DataFrame=None) -> gpd.G
     shape_ = gdf of .shp ,that want to check
     check_df = df that contain true subdistrict and district
     '''
-    if(check_df!=None):
+    if(check_df):
         # แก้ชื่อ subdistrict
         shape = check_subdistrict(shape,check_df)
         # แก้ชื่อ district
@@ -116,6 +121,7 @@ def filter_year(df:pd.DataFrame,start,stop) -> pd.DataFrame:
 
 #--------------------------------------------------------------------------------------------------------------
 def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
+    # df.dropna(subset='province') 
     df.loc[df['province'].str.contains("กรุงเทพ"), 'province'] = "กรุงเทพมหานคร"
     df = df[(df["province"] == "กรุงเทพมหานคร")]
     return df
@@ -123,16 +129,16 @@ def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
 #--------------------------------------------------------------------------------------------------------------
 def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame,check:pd.DataFrame=None) -> pd.DataFrame:
     df_points = gpd.GeoDataFrame(df,geometry=[Point(xy) for xy in zip(df['longitude'], df['latitude'])],crs="EPSG:4326")
-    if(check!=None):
+    if(check):
         verify_df =verify_geopandas(verify_df,check)
     if verify_df.crs != "EPSG:4326":
         verify_df = verify_df.to_crs("EPSG:4326")
     joined = gpd.sjoin(df_points, verify_df, how="left", predicate="within")
     joined = joined[~joined.index.duplicated(keep='first')]
-    result['checkDis'] = (result['DISTRICT_N'] == result['district'])
-    result['checkSub'] = (result['SUBDISTR_1'] == result['subdistrict'])
-    result = result[(((result['checkDis']) & (result['checkSub'])))]
-    result = drop_not_used_columns(df=result,cols=['index_right','OBJECTID','AREA_CAL','AREA_BMA','PERIMETER','ADMIN_ID','SUBDISTRIC','DISTRICT_I','CHANGWAT_I','CHANGWAT_N','geometry', 'SUBDISTR_1', 'DISTRICT_N', 'Shape_Leng','Shape_Area', 'checkDis', 'checkSub'])
+    joined['checkDis'] = (joined['DISTRICT_N'] == joined['district'])
+    joined['checkSub'] = (joined['SUBDISTR_1'] == joined['subdistrict'])
+    joined = joined[(((joined['checkDis']) & (joined['checkSub'])))]
+    joined = drop_not_used_columns(df=joined,cols=['index_right','OBJECTID','AREA_CAL','AREA_BMA','PERIMETER','ADMIN_ID','SUBDISTRIC','DISTRICT_I','CHANGWAT_I','CHANGWAT_N','geometry', 'SUBDISTR_1', 'DISTRICT_N', 'Shape_Leng','Shape_Area', 'checkDis', 'checkSub'])
     return joined
  
 
