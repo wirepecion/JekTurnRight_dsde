@@ -26,6 +26,8 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     check_df = get_raw_data(csv_to_check_shape_path)
     df = verify_coordination_with_address(df=df,verify_df=shape_gdf,check=check_df)
     df = clean_type_columns(df)      #Clean 'type' column
+    
+    df = clean_address(df, )
 
     return df
 #--------------------------------------------------------------------------------------------------------------
@@ -135,34 +137,7 @@ def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame,
     result = drop_not_used_columns(df=result,cols=['index_right','OBJECTID','AREA_CAL','AREA_BMA','PERIMETER','ADMIN_ID','SUBDISTRIC','DISTRICT_I','CHANGWAT_I','CHANGWAT_N','geometry', 'SUBDISTR_1', 'DISTRICT_N', 'Shape_Leng','Shape_Area', 'checkDis', 'checkSub'])
     return joined
  
-
-#=============== Insight ===============#
-
-def Co_occurrence_analysis(df, correlation_check__tag):
-    s = df['type'].value_counts()
-
-    s_roads = s[s.index.str.contains(correlation_check__tag)]
-    co_occurrence_counts = {}
-
-    for tag_set_str, count in s_roads.items():
-    
-        tags = tag_set_str.strip('{}').split(',')
-        if len(tags) == 1:
-            co_occurrence_counts[correlation_check__tag] = co_occurrence_counts.get(correlation_check__tag, 0) + count
-            
-        else:
-            for tag in tags:
-                if tag != correlation_check__tag:
-                    co_occurrence_counts[tag] = co_occurrence_counts.get(tag, 0) + count
-
-    correlation_series = pd.Series(co_occurrence_counts).sort_values(ascending=False)
-    return correlation_series
-
-def explode_columns(df):
-    df_cleaned = df.dropna(subset=['type'])
-    df_cleaned['type_list'] = df_cleaned['type'].apply(parse_type_string)
-    df_cleaned = df_cleaned.explode('type_list')
-    return df_cleaned
+#=============== Other ===============#
     
 def parse_type_string(text):
     if not isinstance(text, str) or pd.isna(text):
@@ -171,21 +146,3 @@ def parse_type_string(text):
     items = text.split(',')
     cleaned_items = [item.strip() for item in items if item.strip()]
     return cleaned_items
-
-def get_heat_map(df: pd.DataFrame, shape: gpd.GeoDataFrame, drop_missed_value: bool = False) -> pd.DataFrame:
-    
-    map_df_col  = 'subdistrict'
-    map_BMA_col = 'SUBDISTR_1'
-    tag         = 'น้ำท่วม'
-    
-    flood_reports = df[df['type_list'] == tag]
-    flood_counts = flood_reports.groupby(map_df_col).size().reset_index(name='flood_report_count')
-
-    map_with_flood_counts = shape.merge(flood_counts, left_on=map_BMA_col, right_on=map_df_col, how='left')
-    map_with_flood_counts['flood_report_count'] = map_with_flood_counts['flood_report_count'].fillna(0)
-
-    map_with_flood_counts.explore(
-    column='flood_report_count',
-    cmap='Blues',
-    legend=True
-)
