@@ -19,28 +19,26 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = drop_nan_rows(df)           #Drop nan value (rows) 
     df = convert_data_types(df)      #Convert data types
     df = add_crucial_cols(df)        #Add crucial columns
-    df = drop_not_used_columns(df,cols = ['photo', 'photo_after', 'star'])
     df = filter_year(df,start=2022,stop=2024)
     df = drop_not_use_province(df)
+    df = drop_not_used_columns(df,cols = ['photo', 'photo_after', 'star','province'])
     shape_gdf =get_shape_file(shape_path)
-
     if(csv_to_check_shape_path):
         check_df = get_raw_data(csv_to_check_shape_path)
         df = verify_coordination_with_address(df=df,verify_df=shape_gdf,check=check_df)
     else:
         df = verify_coordination_with_address(df=df,verify_df=shape_gdf)
-
-    df = clean_type_columns(df)      #Clean 'type' column
-
-    return df
+    cleaned = clean_type_columns(df)      #Clean 'type' column
+    return cleaned
 #--------------------------------------------------------------------------------------------------------------
 def convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
 
     #Convert data types
     df['timestamp'] = pd.to_datetime(df['timestamp'], format='ISO8601')
     df['last_activity'] = pd.to_datetime(df['last_activity'], format='ISO8601')
-    
+
     return df
+
 #--------------------------------------------------------------------------------------------------------------
 def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
 
@@ -51,22 +49,25 @@ def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
 
     #Extract longitude and latitude from 'coords' column
     df[['longitude', 'latitude']] = df['coords'].str.split(',', expand=True).astype(float)
-    
+
     return df
+    
+
 #--------------------------------------------------------------------------------------------------------------
 def drop_nan_rows(df: pd.DataFrame) -> pd.DataFrame:
 
     #Drop row which contain nan value 
     cols = ['ticket_id', 'type', 'organization', 'coords', 'province', 'timestamp', 'last_activity']
-    df = df.dropna(subset=cols, inplace=False)
-    
+    df = df.dropna(subset=cols)
     return df
+
 #--------------------------------------------------------------------------------------------------------------
 def drop_not_used_columns(df: pd.DataFrame,cols:list) -> pd.DataFrame:
     #Drop not-used column
     df = df.drop(columns=cols, axis='columns')  
-    
     return df
+
+
 #--------------------------------------------------------------------------------------------------------------
 def clean_type_columns(df: pd.DataFrame, explode: bool = False) -> pd.DataFrame:
     
@@ -77,14 +78,6 @@ def clean_type_columns(df: pd.DataFrame, explode: bool = False) -> pd.DataFrame:
         df = df.explode['type_list']
     
     return df
-
-#--------------------------------------------------------------------------------------------------------------
-def clean_address(df: pd.DataFrame, shape: gpd.GeoDataFrame, drop_missed_value: bool = False) -> pd.DataFrame:
-    
-    df_col  = 'subdistrict'
-    BMA_col = 'SUBDISTR_1'
-    tag     = 'น้ำท่วม'
-
 #--------------------------------------------------------------------------------------------------------------
 def verify_geopandas(shape:gpd.GeoDataFrame,check_df:pd.DataFrame=None) -> gpd.GeoDataFrame:
     '''
@@ -118,6 +111,7 @@ def check_district(shape_gdf:gpd.GeoDataFrame,district:pd.DataFrame) -> gpd.GeoD
 def filter_year(df:pd.DataFrame,start,stop) -> pd.DataFrame:
     df = df[(df['year_timestamp']>=start)&(df['year_timestamp']<=stop)]
     return df
+
 
 #--------------------------------------------------------------------------------------------------------------
 def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
