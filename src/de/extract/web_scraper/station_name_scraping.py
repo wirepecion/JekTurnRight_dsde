@@ -41,7 +41,10 @@ def parse_locations_data(raw_js_array: str) -> pd.DataFrame:
         DataFrame with one row per station and selected clean columns.
     """
     # 1) Safely convert JS array string -> Python list
-    locations_data = ast.literal_eval(raw_js_array)
+    try:
+        locations_data = ast.literal_eval(raw_js_array)
+    except (ValueError, SyntaxError) as e:
+        raise ValueError(f"Failed to parse JS array string: {e}") from e
 
     # 2) Full DataFrame with all columns
     df = pd.DataFrame(locations_data, columns=STATION_COLUMNS)
