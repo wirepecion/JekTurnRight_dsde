@@ -34,8 +34,7 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = add_crucial_cols(df)        #Add crucial columns
     df = filter_year(df,start=2022,stop=2024)
     df = drop_not_use_province(df)
-    df = drop_not_used_columns(df,cols = ['photo', 'photo_after', 'star','province'])
-    df = df = convert_to_date(df)
+    
     shape_gdf =get_shape_file(shape_path)
     if(csv_to_check_shape_path is not None):
         check_df = get_raw_data(csv_to_check_shape_path)
@@ -82,7 +81,9 @@ def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
     df =df.copy()
     df['year_timestamp'] = df['timestamp'].dt.year
     df['month_timestamp'] = df['timestamp'].dt.month
-    df['day_timestamp'] = df['timestamp'].dt.day
+    df['days_timestamp'] = df['timestamp'].dt.day
+    # df['date_timestamp'] = df['timestamp'].dt.date
+
     #Extract longitude and latitude from 'coords' column
     df[['longitude', 'latitude']] = df['coords'].str.split(',', expand=True).astype(float)
     return df
@@ -107,8 +108,9 @@ def drop_not_used_columns(df: pd.DataFrame,cols:list) -> pd.DataFrame:
 def clean_type_columns(df: pd.DataFrame, explode: bool = False) -> pd.DataFrame:
     df =df.copy()
     df = df[df['type'] != '{}']
+    df['type_list'] = df['type'].apply(parse_type_string) 
+
     if(explode):
-        df['type_list'] = df['type'].apply(parse_type_string) 
         df = df.explode('type_list')
     
     return df
@@ -118,7 +120,7 @@ def verify_geopandas(shape:gpd.GeoDataFrame,check_df:pd.DataFrame=None) -> gpd.G
     shape_ = gdf of .shp ,that want to check
     check_df = df that contain true subdistrict and district
     '''
-    if(check_df is not None):
+    if check_df is not None:
         # แก้ชื่อ subdistrict
         shape = check_subdistrict(shape,check_df)
         # แก้ชื่อ district
@@ -157,7 +159,7 @@ def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
 #--------------------------------------------------------------------------------------------------------------
 def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame,check:pd.DataFrame=None) -> pd.DataFrame:
     df_points = gpd.GeoDataFrame(df,geometry=[Point(xy) for xy in zip(df['longitude'], df['latitude'])],crs="EPSG:4326")
-    if(check is not None):
+    if check is not None:
         verify_df =verify_geopandas(verify_df,check)
     if verify_df.crs != "EPSG:4326":
         verify_df = verify_df.to_crs("EPSG:4326")
