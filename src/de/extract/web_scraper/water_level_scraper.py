@@ -19,7 +19,7 @@ def generate_payload(date_str: str) -> dict:
         "datePick_end": date_str,
         "StationTime_end": "23:59",
         "button": "print",
-        "note": "imsorrythisisformyprojectindatasciencethereisnointtentiontoattack",
+        "note": "imsorrythisisformyprojectindatasciencethereisnointentiontoattack",
     }
     if is_dec_31:
         payload["rain_type"] = "10"
@@ -89,7 +89,7 @@ def scrape_range(start_date: str, end_date: str, sleep_sec: float = 0.5) -> pd.D
             df = scrape_one_day(d, session=session)
             if df is not None:
                 all_rows.append(df)
-            time.sleep(sleep_sec)  # be nice
+            time.sleep(sleep_sec)  # Rate limiting to avoid overwhelming the server
 
     if not all_rows:
         raise RuntimeError("No data scraped for any date.")

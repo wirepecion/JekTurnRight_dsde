@@ -48,5 +48,5 @@ def ensure_dirs() -> None:
     Create standard data dirs if they don't exist yet.
     Safe to call multiple times.
     """
-    for d in [DATA_DIR, RAW_DIR, PROCESSED_DIR, EXTERNAL, OUTPUT_DIR, CLEANED_TRAFFY_PATH, FLOOD_TS_PATH]:
+    for d in [DATA_DIR, RAW_DIR, PROCESSED_DIR, EXTERNAL, OUTPUT_DIR, CLEANED_TRAFFY_PATH.parent, FLOOD_TS_PATH.parent]:
         d.mkdir(parents=True, exist_ok=True)
