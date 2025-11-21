@@ -48,6 +48,7 @@ def add_crucial_cols(df: pd.DataFrame) -> pd.DataFrame:
     df['year_timestamp'] = df['timestamp'].dt.year
     df['month_timestamp'] = df['timestamp'].dt.month
     df['days_timestamp'] = df['timestamp'].dt.day
+    # df['date_timestamp'] = df['timestamp'].dt.date
 
     #Extract longitude and latitude from 'coords' column
     df[['longitude', 'latitude']] = df['coords'].str.split(',', expand=True).astype(float)
@@ -71,10 +72,10 @@ def drop_not_used_columns(df: pd.DataFrame,cols:list) -> pd.DataFrame:
 def clean_type_columns(df: pd.DataFrame, explode: bool = False) -> pd.DataFrame:
     
     df = df[df['type'] != '{}']
+    df['type_list'] = df['type'].apply(parse_type_string) 
 
     if(explode):
-        df['type_list'] = df['type'].apply(parse_type_string) 
-        df = df.explode['type_list']
+        df = df.explode('type_list')
     
     return df
 
