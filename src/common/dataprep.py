@@ -22,6 +22,7 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = drop_not_used_columns(df,cols = ['photo', 'photo_after', 'star'])
     df = filter_year(df,start=2022,stop=2024)
     df = drop_not_use_province(df)
+    
     shape_gdf =get_shape_file(shape_path)
 
     if(csv_to_check_shape_path):
@@ -92,7 +93,7 @@ def verify_geopandas(shape:gpd.GeoDataFrame,check_df:pd.DataFrame=None) -> gpd.G
     shape_ = gdf of .shp ,that want to check
     check_df = df that contain true subdistrict and district
     '''
-    if(check_df):
+    if check_df is not None:
         # แก้ชื่อ subdistrict
         shape = check_subdistrict(shape,check_df)
         # แก้ชื่อ district
@@ -130,7 +131,7 @@ def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
 #--------------------------------------------------------------------------------------------------------------
 def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame,check:pd.DataFrame=None) -> pd.DataFrame:
     df_points = gpd.GeoDataFrame(df,geometry=[Point(xy) for xy in zip(df['longitude'], df['latitude'])],crs="EPSG:4326")
-    if(check):
+    if check is not None:
         verify_df =verify_geopandas(verify_df,check)
     if verify_df.crs != "EPSG:4326":
         verify_df = verify_df.to_crs("EPSG:4326")
