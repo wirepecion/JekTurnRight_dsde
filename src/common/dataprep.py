@@ -33,6 +33,7 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = convert_data_types(df)      #Convert data types
     df = add_crucial_cols(df)        #Add crucial columns
     df = filter_year(df,start=2022,stop=2024)
+    df = drop_not_used_columns(df, cols=['photo', 'photo_after', 'star']) 
     df = drop_not_use_province(df)
     
     shape_gdf =get_shape_file(shape_path)
