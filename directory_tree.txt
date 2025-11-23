@@ -1,87 +1,142 @@
 .
+├── README.md
+├── __init__.py
+├── animated_flood_map.html
 ├── data
 │   ├── external
-│   │   ├── rain_water_merged_2022_to_2024.csv
-│   │   └── station_metadata.csv
+│   │   ├── rainfall.csv
+│   │   └── station.csv
 │   ├── processed
 │   │   ├── flood_daily_by_district.parquet
 │   │   │   ├── _SUCCESS
 │   │   │   └── part-00000-0cdfc9ef-1800-44b1-b4ed-574ce2889626-c000.snappy.parquet
+│   │   ├── flood_data_test.csv
 │   │   ├── traffy_clean.parquet
 │   │   │   ├── _SUCCESS
 │   │   │   └── part-00000-75d8226b-8823-44fb-b317-6f2d28bf0768-c000.snappy.parquet
-│   │   ├── flood_data_test.csv
 │   │   └── water_and_sun_report.csv
 │   └── raw
 │       ├── bangkok_traffy.csv
 │       └── bma_rain_station_js_array.txt
+├── directory_tree.txt
+├── monthly_flood_heatmap.html
 ├── notebooks
 │   ├── example_analysis.ipynb
 │   ├── insight.ipynb
 │   └── merge_scraped_data.ipynb
 ├── pipelines
 │   └── jobs
+│       ├── __pycache__
+│       │   ├── download_raw_data.cpython-310.pyc
+│       │   ├── scrape_water_levels.cpython-310.pyc
+│       │   ├── station_name_scraping.cpython-310.pyc
+│       │   └── traffy_flood_etl.cpython-310.pyc
 │       ├── download_raw_data.py
 │       ├── scrape_water_levels.py
 │       ├── station_name_scraping.py
 │       └── traffy_flood_etl.py
+├── pyproject.toml
+├── requirements.txt
 ├── src
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   └── __init__.cpython-310.pyc
 │   ├── common
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── config.cpython-310.pyc
+│   │   │   ├── dataprep.cpython-310.pyc
+│   │   │   ├── insight.cpython-310.pyc
+│   │   │   └── utils.cpython-310.pyc
+│   │   ├── config.py
+│   │   ├── dataprep
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── geo_utils.cpython-310.pyc
+│   │   │   │   ├── io.cpython-310.pyc
+│   │   │   │   ├── mergers.cpython-310.pyc
+│   │   │   │   ├── pipeline.cpython-310.pyc
+│   │   │   │   └── services.cpython-310.pyc
+│   │   │   ├── geo_utils.py
+│   │   │   ├── imputer.py
+│   │   │   ├── io.py
+│   │   │   ├── mergers.py
+│   │   │   ├── pipeline.py
+│   │   │   ├── services.py
+│   │   │   └── validators.py
+│   │   ├── datapreps.py
+│   │   ├── insight.py
 │   │   ├── scraping
 │   │   │   ├── README.md
+│   │   │   ├── da
 │   │   │   ├── rain_water_merged_2022_to_2024.csv
-│   │   │   ├── station_metadata.csv
 │   │   │   ├── station_name_scraping.py
 │   │   │   └── water_level_scraping.py
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── dataprep.py
-│   │   ├── insight.py
 │   │   └── utils.py
 │   ├── de
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   └── __init__.cpython-310.pyc
 │   │   ├── extract
-│   │   │   ├── web_scraper
-│   │   │   │   ├── README.md
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── scraper.py
-│   │   │   │   ├── station_name_scraping.py
-│   │   │   │   └── water_level_scraper.py
 │   │   │   ├── __init__.py
-│   │   │   └── download_traffy.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   └── download_traffy.cpython-310.pyc
+│   │   │   ├── download_traffy.py
+│   │   │   └── web_scraper
+│   │   │       ├── README.md
+│   │   │       ├── __init__.py
+│   │   │       ├── __pycache__
+│   │   │       │   ├── __init__.cpython-310.pyc
+│   │   │       │   ├── scraper.cpython-310.pyc
+│   │   │       │   ├── station_name_scraping.cpython-310.pyc
+│   │   │       │   ├── water_level_scraper.cpython-310.pyc
+│   │   │       │   └── water_level_scraping.cpython-310.pyc
+│   │   │       ├── scraper.py
+│   │   │       ├── station_name_scraping.py
+│   │   │       └── water_level_scraper.py
 │   │   ├── load
 │   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   └── loader.cpython-310.pyc
 │   │   │   └── loader.py
 │   │   ├── spark_jobs
 │   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── etl_example.cpython-310.pyc
+│   │   │   │   └── traffy_flood_etl.cpython-310.pyc
 │   │   │   ├── main_traffy_etl.py
 │   │   │   └── traffy_flood_etl.py
-│   │   ├── transform
-│   │   │   ├── __init__.py
-│   │   │   └── transformers.py
-│   │   └── __init__.py
-│   ├── ds
-│   │   ├── weights
-│   │   │   ├── model.pt
-│   │   │   ├── model.pth
-│   │   │   └── scaler.pkl
-│   │   ├── __init__.py
-│   │   ├── analyzer.py
-│   │   ├── hf.py
-│   │   ├── test.ipynb
-│   │   ├── train.py
-│   │   └── tune_optuna.py
-│   └── __init__.py
+│   │   └── transform
+│   │       ├── __init__.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-310.pyc
+│   │       │   └── transformers.cpython-310.pyc
+│   │       └── transformers.py
+│   └── ds
+│       ├── __init__.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-310.pyc
+│       │   └── analyzer.cpython-310.pyc
+│       ├── analyzer.py
+│       ├── hf.py
+│       ├── test.ipynb
+│       ├── train.py
+│       ├── tune_optuna.py
+│       └── weights
+│           ├── model.pt
+│           ├── model.pth
+│           └── scaler.pkl
+├── static_heatmap.html
 ├── tests
 │   ├── __init__.py
-│   └── test_common.py
-├── README.md
-├── __init__.py
-├── animated_flood_map.html
-├── directory_tree.txt
-├── monthly_flood_heatmap.html
-├── pyproject.toml
-├── requirements.txt
-├── static_heatmap.html
+│   ├── test_common.py
+│   ├── test_dataprep_services.py
+│   └── test_pipeline_ml.py
 └── uv.lock
 
-21 directories, 63 files
+34 directories, 105 files

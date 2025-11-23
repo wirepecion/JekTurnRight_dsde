@@ -12,6 +12,7 @@ dependencies = [
     "scikit-learn>=1.3.0",
     "gdown",
     "pytest",
+    "geopandas",
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,3 @@
-"""
-Data loading utilities for various formats.
-"""
 import pandas as pd
 from pathlib import Path
 from typing import Optional
