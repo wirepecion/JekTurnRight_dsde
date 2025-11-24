@@ -13,8 +13,6 @@ dependencies = [
     "gdown",
     "pytest",
     "geopandas",
-    "airflow",
-    "apache-airflow-providers-fab",
 ]
 
 [project.optional-dependencies]
