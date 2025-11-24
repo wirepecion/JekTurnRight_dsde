@@ -138,7 +138,7 @@ class GeoMatcher:
         return joined
 
     @staticmethod
-    def get_centroid(shape_df: gpd.GeoDataFrame) -> pd.DataFrame:
+    def get_centroid(shape_df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         shape_centers = shape_df.copy()
         logger.info("Computing centroids for subdistrict polygons")
         shape_centers["centroid"] = shape_centers.geometry.centroid.to_crs(epsg=4326)
