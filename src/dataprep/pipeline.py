@@ -91,3 +91,38 @@ class FloodDataPipeline:
         except Exception as e:
             logger.error(f"!!! Pipeline Failed: {e}", exc_info=True)
             raise e
+        
+class VisualizationDataPipeline:
+    """
+    A separate pipeline for preparing data for visualization purposes.
+    Could include aggregation, filtering, or formatting steps specific to visualization needs.
+    """
+    def __init__(self, config: PipelineConfig):
+        self.cfg = config
+
+    def run(self) -> pd.DataFrame:
+        # --- STEP 1: LOAD ---
+        logger.info(">>> [1/3] Loading Data...")
+        raw_traffy = io.load_csv(self.cfg.traffy_path)
+        shape_gdf = io.load_shapefile(self.cfg.shape_path)
+
+        # --- STEP 2: CLEAN ---
+        logger.info(">>> [2/3] Cleaning Data...")
+        # Clean Traffy
+        df = cleaning.drop_nan_rows(raw_traffy, ['coords', 'timestamp', 'type'])
+        df = df[df['type'] != '{}']
+        df = cleaning.convert_types(df)
+        df = cleaning.extract_time_features(df)
+        df = df[(df['year_timestamp'] >= self.cfg.year_start) & (df['year_timestamp'] <= self.cfg.year_end)]
+        df = cleaning.parse_coordinates(df)
+        df = cleaning.clean_province_name(df)
+        df = cleaning.parse_type_column(df)
+
+        # --- STEP 3: SPATIAL VERIFY (Traffy Points) ---
+        logger.info(">>> [3/3] Verifying Traffy Coordinates...")
+        df = geo.spatial_join_verification(df, shape_gdf)
+        # Ensure date column exists
+        df['date'] = df['timestamp'].dt.date
+
+        return df
+    

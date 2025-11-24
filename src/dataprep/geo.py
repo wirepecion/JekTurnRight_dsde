@@ -110,3 +110,22 @@ def get_nearest_station(df: pd.DataFrame, station_df: pd.DataFrame) -> pd.DataFr
             df.loc[mask, 'station_code'] = assigned_codes
             
     return df
+
+def get_subdistrict_centroids_visual(shape_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Converts polygon shapefile to a DataFrame of centroids (lat/lon).
+    Used to map every subdistrict to a weather station.
+    """
+    gdf = shape_gdf.copy()
+    # Convert to centroid points
+    # Warning: Ideally project to meters (UTM) before centroid, but EPSG:4326 is acceptable for small areas like BKK
+    centroids = gdf.geometry.centroid.to_crs(epsg=4326)
+    
+    return gpd.GeoDataFrame({
+        'subdistrict': gdf['subdistrict'],
+        'district': gdf['district'],
+        'geometry': gdf['geometry'],
+        'centroid': centroids,
+        'latitude': centroids.y,
+        'longitude': centroids.x
+    })
