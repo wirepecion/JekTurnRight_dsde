@@ -1,210 +1,237 @@
 """
-jobs/spark/traffy_etl_job.py
-----------------------------
-The "Boss" ETL Job.
-Orchestrates data cleaning, spatial mapping, and rainfall enrichment.
+src/spark_jobs/traffy_etl_job.py
+--------------------------------
+The Main Spark Application.
+Refactored to ensure COMPLETE Time Series (Every Subdistrict x Every Date).
+
+Logic:
+1. Master Location Table: Map every Subdistrict Centroid -> Nearest Station.
+2. Rain Expansion: Broadcast rain from Station -> Subdistrict.
+3. Flood Aggregation: Count reports per Subdistrict/Date.
+4. Densification: Cross Join Dates x Locations to fill gaps.
+5. Feature Engineering: Calculate API on the dense data.
 
 Usage:
-  spark-submit \
-    --master local[*] \
-    --py-files jobs/spark/utils/geo_spark.py \
-    --files conf/log4j2.properties \
-    jobs/spark/traffy_etl_job.py \
-    --input data/raw/bangkok_traffy.csv \
-    --station data/external/station.csv \
-    --rainfall data/external/rainfall.csv \
-    --output data/processed/flood_training_data
+  export PYTHONPATH=$PYTHONPATH:.
+  spark-submit --master local[2] --driver-memory 4g src/spark_jobs/traffy_etl_job.py
 """
-
 import sys
-import argparse
-import pandas as pd # Used only on Driver for small reference data
-from pyspark.sql import SparkSession
+import logging
+import pandas as pd
+import numpy as np
+import geopandas as gpd
+from sklearn.neighbors import BallTree
+from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, DateType, TimestampType
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# Import Custom Spatial Logic (Must be passed via --py-files)
-try:
-    from utils.geo_spark import set_broadcast_variable, build_station_index, find_nearest_station
-except ImportError:
-    print("CRITICAL ERROR: utils.geo_spark not found. Did you forget '--py-files jobs/spark/utils/geo_spark.py'?")
-    sys.exit(1)
+# --- IMPORT WORKER MODULES ---
+from src.dataprep import io, mergers
+from src.spark_jobs import cleaning
 
-def get_logger(spark):
-    """Bridge Python logging to Spark's Log4j"""
-    log4j = spark._jvm.org.apache.log4j
-    return log4j.LogManager.getLogger("TraffyFloodETL")
+# Setup Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Traffy Flood ETL")
-    parser.add_argument("--input", required=True, help="Path to raw Traffy CSV")
-    parser.add_argument("--station", required=True, help="Path to station metadata CSV")
-    parser.add_argument("--rainfall", required=True, help="Path to rainfall CSV")
-    parser.add_argument("--output", required=True, help="Path to save Parquet output")
-    return parser.parse_args()
+def get_master_location_map(shape_path, station_path):
+    """
+    Runs on Driver (Pandas/Geopandas).
+    Creates a master mapping: Subdistrict -> Lat/Lon (Centroid) -> Nearest Station.
+    """
+    logger.info(">>> [Driver] Building Master Location Map (Subdistrict -> Station)...")
+    
+    # 1. Load Shapefile & Get Centroids
+    gdf = gpd.read_file(shape_path)
+    # Rename cols to match standard
+    gdf = gdf.rename(columns={'SUBDISTR_1': 'subdistrict', 'DISTRICT_N': 'district'})
+    gdf = gdf.to_crs("EPSG:4326")
+    centroids = gdf.geometry.centroid
+    
+    df_loc = pd.DataFrame({
+        'subdistrict': gdf['subdistrict'],
+        'district': gdf['district'],
+        'latitude': centroids.y,
+        'longitude': centroids.x
+    })
+    
+    # 2. Load Stations
+    station_df = pd.read_csv(station_path)
+    station_df = mergers.clean_station_metadata(station_df)
+    
+    # 3. Map Subdistrict Centroids to Nearest Station using BallTree
+    # (Same logic as your original python code, but run once for metadata)
+    station_coords = np.radians(station_df[['latitude', 'longitude']].values)
+    loc_coords = np.radians(df_loc[['latitude', 'longitude']].values)
+    
+    tree = BallTree(station_coords, metric='haversine')
+    dist, idx = tree.query(loc_coords, k=1)
+    
+    df_loc['station_code'] = station_df.iloc[idx.flatten()]['station_code'].values
+    
+    # Returns: [subdistrict, district, latitude, longitude, station_code]
+    return df_loc
 
 def main():
-    # 1. Parse Arguments
-    args = parse_args()
-
-    # 2. Initialize Spark
-    spark = SparkSession.builder \
-        .appName("TraffyFloodETL_Production") \
-        .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
-        .config("spark.driver.extraJavaOptions", "-Dlog4j.configuration=file:conf/log4j2.properties") \
-        .getOrCreate()
-
-    logger = get_logger(spark)
-    logger.info(f"Starting ETL Job. Input: {args.input}")
+    # 1. Initialize Spark
+    logger.info(">>> [1/7] Initializing Spark...")
+    spark = (SparkSession.builder
+             .appName("TraffyFloodETL_Production")
+             .master("local[2]")
+             .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+             .config("spark.sql.execution.arrow.maxRecordsPerBatch", "1000")
+             .config("spark.driver.memory", "4g")
+             .getOrCreate())
+    spark.sparkContext.setLogLevel("WARN")
 
     try:
-        # ====================================================
-        # PHASE 1: BROADCAST STATION LOOKUP (Driver Side)
-        # ====================================================
-        logger.info(">>> Phase 1: Building Spatial Index for Stations...")
+        # =========================================================
+        # STEP 2: PREPARE BACKBONE (Date x Location)
+        # =========================================================
+        logger.info(">>> [2/7] Preparing Backbone (Locations & Dates)...")
         
-        # [cite_start]We use Pandas here because station data is tiny (< 1MB) [cite: 3]
-        station_pd = pd.read_csv(args.station)
-        
-        # [cite_start]Clean Station Data (Logic ported from mergers.py) [cite: 3]
-        station_pd = station_pd.rename(columns={
-            "StationCode": "station_code",
-            "DistrictName": "district",
-            "Latitude": "latitude",
-            "Longitude": "longitude"
-        })
-        
-        # Fix District Names (Standardize spelling)
-        replacements = {
-            "ป้อมปราบฯ": "ป้อมปราบศัตรูพ่าย",
-            "ราษฏร์บูรณะ": "ราษฎร์บูรณะ"
-        }
-        station_pd["district"] = station_pd["district"].replace(replacements)
-        
-        # Remove prefix 'BKK' if exists (Logic from services.py)
-        station_pd["station_code"] = station_pd["station_code"].apply(
-            lambda x: x[3:] if isinstance(x, str) and len(x) == 9 else x
+        # A. Create Master Location DataFrame (Subdistrict -> Station)
+        # We do this on driver because logic is complex but data is small
+        pdf_master = get_master_location_map(
+            "data/raw/BMA/BMA_ADMIN_SUB_DISTRICT.shp", 
+            "data/external/station.csv"
         )
-
-        # Build & Broadcast the Spatial Tree
-        station_index = build_station_index(station_pd)
-        broadcast_var = spark.sparkContext.broadcast(station_index)
-        set_broadcast_variable(broadcast_var) # Register on Workers
+        df_master_loc = spark.createDataFrame(pdf_master)
         
-        logger.info(f"Broadcasted {len(station_pd)} stations to workers.")
-
-        # ====================================================
-        # PHASE 2: INGEST & CLEAN TRAFFY DATA (Distributed)
-        # ====================================================
-        logger.info(">>> Phase 2: Processing Traffy Flood Reports...")
+        # B. Create Date Sequence (2022-2024)
+        df_dates = spark.sql("""
+            SELECT explode(sequence(
+                to_date('2022-01-01'), 
+                to_date('2024-12-31'), 
+                interval 1 day
+            )) as date
+        """)
         
-        df_raw = spark.read.option("header", "true").csv(args.input)
+        # C. Cross Join: Every Subdistrict on Every Day
+        # This is our "Skeleton". It ensures NO day is missing.
+        df_skeleton = df_dates.crossJoin(df_master_loc)
         
-        # [cite_start]Select & Cast basic columns [cite: 2]
-        df_clean = df_raw.select(
-            F.col("ticket_id"),
-            F.col("type"),
-            F.col("timestamp"),
-            F.col("coords"),
-            F.col("province"),
-            F.col("district").alias("district_traffy"), # Rename to avoid join collision later
-            F.col("subdistrict")
-        )
-
-        # [cite_start]Apply Filters (Logic from pipeline.py) [cite: 3]
-        df_clean = df_clean \
-            .filter(F.col("province").contains("กรุงเทพ")) \
-            .withColumn("timestamp_dt", F.to_timestamp("timestamp")) \
-            .filter(
-                (F.year("timestamp_dt") >= 2022) & 
-                (F.year("timestamp_dt") <= 2024)
-            )
-
-        # Parse Coordinates (Split "100.5,13.7")
-        df_clean = df_clean \
-            .withColumn("longitude", F.split("coords", ",").getItem(0).cast(DoubleType())) \
-            .withColumn("latitude", F.split("coords", ",").getItem(1).cast(DoubleType())) \
-            .filter(F.col("latitude").isNotNull() & F.col("longitude").isNotNull())
-
-        # ====================================================
-        # PHASE 3: SPATIAL MAPPING (The Heavy Lifting)
-        # ====================================================
-        logger.info(">>> Phase 3: Executing Vectorized Spatial UDF...")
+        # =========================================================
+        # STEP 3: EXPAND RAINFALL
+        # =========================================================
+        logger.info(">>> [3/7] Expanding Rainfall to Subdistricts...")
         
-        # This uses the Broadcast variable to find nearest station for each row
-        # using the 'district_traffy' to narrow the search scope
-        df_mapped = df_clean.withColumn(
-            "station_code",
-            find_nearest_station(F.col("district_traffy"), F.col("latitude"), F.col("longitude"))
-        )
+        # Load Rain
+        rain_pd = io.load_csv("data/external/rainfall.csv")
+        rain_pd_clean = mergers.clean_rainfall_data(rain_pd)
+        df_rain = spark.createDataFrame(rain_pd_clean) # Cols: date, station_code, rainfall
         
-        # Cache this result because we might use it twice (debug count + join)
-        df_mapped.cache()
-        # Trigger an action to force the UDF to run and catch errors early
-        mapped_count = df_mapped.count()
-        logger.info(f"Successfully mapped {mapped_count} flood reports.")
-
-        # ====================================================
-        # PHASE 4: ENRICH WITH RAINFALL
-        # ====================================================
-        logger.info(">>> Phase 4: Merging Rainfall Data...")
-        
-        df_rain = spark.read.option("header", "true").csv(args.rainfall)
-        
-        # [cite_start]Dynamic Stack (Unpivot) - "melt" in Spark SQL [cite: 3]
-        # Identifies all columns that look like station codes (S01, S02...)
-        station_cols = [c for c in df_rain.columns if c not in ["Date", "time"]]
-        
-        if not station_cols:
-            logger.warn("No station columns found in rainfall data!")
-        
-        # Generate the SQL stack expression string
-        stack_expr = f"stack({len(station_cols)}, " + \
-                     ", ".join([f"'{c}', `{c}`" for c in station_cols]) + \
-                     ") as (station_code, rainfall)"
-        
-        df_rain_long = df_rain.select(
-            F.col("Date").alias("date_rain"), # Keep string for now
-            F.expr(stack_expr)
-        )
-        
-        # Convert date strings to DateType for joining
-        # Assuming Rainfall Date format matches specific pattern, usually yyyy-MM-dd
-        df_rain_long = df_rain_long.withColumn("date_rain", F.to_date("date_rain"))
-        
-        # Prepare Traffy side for join
-        df_traffy_final = df_mapped.withColumn("date_report", F.to_date("timestamp_dt"))
-
-        # LEFT JOIN: We want all flood reports, even if no rain data found
-        df_result = df_traffy_final.join(
-            df_rain_long,
-            (df_traffy_final.station_code == df_rain_long.station_code) & 
-            (df_traffy_final.date_report == df_rain_long.date_rain),
+        # Join Rain onto Skeleton (via station_code)
+        # Now every subdistrict has rain data for every day
+        df_backbone = df_skeleton.join(
+            df_rain,
+            (df_skeleton.station_code == df_rain.station_code) & 
+            (df_skeleton.date == df_rain.date),
             "left"
         ).select(
-            df_traffy_final["*"],
-            df_rain_long["rainfall"]
+            df_skeleton.date,
+            df_skeleton.subdistrict,
+            df_skeleton.district,
+            df_skeleton.latitude,
+            df_skeleton.longitude,
+            df_rain.rainfall
         )
         
-        # Fill missing rainfall with 0.0 (Assumption: No data = No rain)
-        df_result = df_result.na.fill(0.0, subset=["rainfall"])
+        # Fill Missing Rain (e.g., station error) with 0.0
+        df_backbone = df_backbone.na.fill(0.0, subset=["rainfall"])
 
-        # ====================================================
-        # PHASE 5: WRITE OUTPUT
-        # ====================================================
-        logger.info(f">>> Phase 5: Writing Output to {args.output}")
+        # =========================================================
+        # STEP 4: PROCESS FLOOD REPORTS
+        # =========================================================
+        logger.info(">>> [4/7] Processing Flood Reports...")
         
-        (df_result
+        df_raw = spark.read.option("header", "true").csv("data/raw/bangkok_traffy.csv")
+        
+        df_clean = (df_raw
+            .transform(lambda df: cleaning.drop_nan_rows(df, ["coords", "timestamp"]))
+            .transform(cleaning.convert_types)
+            .transform(cleaning.clean_province_name)
+            .transform(cleaning.parse_type_column)
+        )
+        
+        # Aggregate: Count Reports per Subdistrict/Date
+        df_clean = df_clean.withColumn("is_flood", F.array_contains(F.col("type_list"), "น้ำท่วม"))
+        df_clean = df_clean.withColumn("date_report", F.to_date("timestamp"))
+        
+        df_flood_agg = df_clean.groupBy("subdistrict", "date_report") \
+            .agg(
+                F.count("ticket_id").alias("total_report_real"),
+                F.sum(F.when(F.col("is_flood") == True, 1).otherwise(0)).alias("flood_real")
+            )
+
+        # =========================================================
+        # STEP 5: FINAL MERGE (Backbone + Flood)
+        # =========================================================
+        logger.info(">>> [5/7] Merging Flood Reports into Backbone...")
+        
+        # Left Join: Keep all Backbone rows (dates), attach flood counts if they exist
+        # NOTE: We explicitly drop the right side columns to avoid ambiguity
+        df_final = df_backbone.join(
+            df_flood_agg,
+            (df_backbone.date == df_flood_agg.date_report) & 
+            (df_backbone.subdistrict == df_flood_agg.subdistrict),
+            "left"
+        ).drop(df_flood_agg.subdistrict).drop(df_flood_agg.date_report)
+        
+        # Fill Missing Counts with 0
+        df_final = df_final \
+            .withColumn("total_report", F.coalesce(F.col("total_report_real"), F.lit(0))) \
+            .withColumn("number_of_report_flood", F.coalesce(F.col("flood_real"), F.lit(0))) \
+            .withColumn("target", F.when(F.col("flood_real") > 0, 1).otherwise(0)) \
+            .drop("total_report_real", "flood_real")
+
+        # =========================================================
+        # STEP 6: FEATURE ENGINEERING (Physics)
+        # =========================================================
+        logger.info(">>> [6/7] Calculating Physics (API) & Seasonality...")
+        
+        # 1. Seasonality
+        df_final = df_final \
+            .withColumn("year_timestamp", F.year("date")) \
+            .withColumn("month_timestamp", F.month("date")) \
+            .withColumn("month_sin", F.sin(2 * np.pi * F.col("month_timestamp") / 12)) \
+            .withColumn("month_cos", F.cos(2 * np.pi * F.col("month_timestamp") / 12))
+            
+        # 2. Soil Memory (API)
+        # CRITICAL: Partition by 'subdistrict' now, not 'station_code'
+        w_spec = Window.partitionBy("subdistrict").orderBy("date")
+        
+        df_final = df_final \
+            .withColumn("API_30d", F.avg("rainfall").over(w_spec.rowsBetween(-30, 0))) \
+            .withColumn("API_60d", F.avg("rainfall").over(w_spec.rowsBetween(-60, 0))) \
+            .withColumn("API_90d", F.avg("rainfall").over(w_spec.rowsBetween(-90, 0))) \
+            .na.fill(0.0, subset=["API_30d", "API_60d", "API_90d"])
+
+        # =========================================================
+        # STEP 7: WRITE OUTPUT
+        # =========================================================
+        output_path = "data/processed/flood_training_data_spark"
+        logger.info(f">>> [7/7] Writing Result to {output_path}...")
+        
+        (df_final
          .write
          .mode("overwrite")
-         .partitionBy("district_traffy") # Partitioning optimizes downstream queries
-         .parquet(args.output))
+         .partitionBy("year_timestamp", "month_timestamp")
+         .parquet(output_path))
+         
+        # Check CSV
+        csv_path = "data/processed/flood_training_data_csv"
+        (df_final.coalesce(1).write.mode("overwrite").option("header", "true").csv(csv_path))
+
+        print("\n--- FINAL SCHEMA ---")
+        df_final.printSchema()
         
-        logger.info(">>> JOB COMPLETED SUCCESSFULLY. I AM THE BOSS.")
+        logger.info(">>> JOB SUCCESS. I AM THE BOSS.")
 
     except Exception as e:
-        logger.error(f"!!! JOB FAILED: {str(e)}", exc_info=True)
+        logger.error(f"!!! JOB FAILED: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        spark.stop()
 
 if __name__ == "__main__":
     main()

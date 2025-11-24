@@ -219,7 +219,7 @@ def clean_rainfall(rain_df:pd.DataFrame)->pd.DataFrame:
     return rain_expand_df
 
 #--------------------------------------------------------------------------------------------------------------
-def get_centroid(shape_df:gpd.GeoDataFrame)->pd.DataFrame:
+def get_centroid(shape_df:gpd.GeoDataFrame)->gpd.GeoDataFrame:
     shape_centers = shape_df.copy()
     shape_centers['centroid'] = shape_centers.geometry.centroid.to_crs(epsg=4326)
     shape_centers['latitude'] = shape_centers['centroid'].y

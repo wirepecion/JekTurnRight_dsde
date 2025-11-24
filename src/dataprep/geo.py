@@ -7,13 +7,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def verify_and_correct_names(shape_gdf: gpd.GeoDataFrame, ref_df: pd.DataFrame) -> gpd.GeoDataFrame:
-    """Aligns District/Subdistrict names in Shapefile using a Reference CSV."""
-    if ref_df is None: 
-        return shape_gdf
-    # Simple pass-through if no reference DF is provided
-    return shape_gdf
-
 def spatial_join_verification(df: pd.DataFrame, shape_gdf: gpd.GeoDataFrame) -> pd.DataFrame:
     """
     Performs Point-in-Polygon check.
@@ -32,17 +25,14 @@ def spatial_join_verification(df: pd.DataFrame, shape_gdf: gpd.GeoDataFrame) -> 
     joined = gpd.sjoin(gdf_points, shape_gdf, how="left", predicate="within")
     
     # 4. Filter: logic must match (claimed district == actual polygon district)
-    # Note: We handle cases where the raw data might be missing district info
     if 'district_left' in joined.columns and 'district_right' in joined.columns:
         valid_mask = (joined['district_left'] == joined['district_right']) & \
                      (joined['subdistrict_left'] == joined['subdistrict_right'])
         valid_data = joined[valid_mask].copy()
     else:
-        # If raw data didn't have district columns, we rely purely on the shapefile's result
         valid_data = joined.copy()
 
-    # 5. Rename columns back! (The Fix)
-    # We keep the 'left' (original) versions but rename them back to standard names
+    # 5. Rename columns back
     rename_dict = {
         'district_left': 'district',
         'subdistrict_left': 'subdistrict'
@@ -50,20 +40,40 @@ def spatial_join_verification(df: pd.DataFrame, shape_gdf: gpd.GeoDataFrame) -> 
     valid_data = valid_data.rename(columns=rename_dict)
     
     # 6. Clean up columns
-    # Drop the shapefile's columns (_right) and geometry artifacts
     drop_cols = ['geometry', 'index_right', 'district_right', 'subdistrict_right']
     return valid_data.drop(columns=drop_cols, errors='ignore')
+
+# ... existing imports ...
+
+def get_subdistrict_centroids(shape_gdf: gpd.GeoDataFrame) -> pd.DataFrame:
+    """
+    Converts polygon shapefile to a DataFrame of centroids (lat/lon).
+    Used to map every subdistrict to a weather station.
+    """
+    gdf = shape_gdf.copy()
+    # Convert to centroid points
+    # Warning: Ideally project to meters (UTM) before centroid, but EPSG:4326 is acceptable for small areas like BKK
+    centroids = gdf.geometry.centroid.to_crs(epsg=4326)
+    
+    return pd.DataFrame({
+        'subdistrict': gdf['subdistrict'],
+        'district': gdf['district'],
+        'latitude': centroids.y,
+        'longitude': centroids.x
+    })
 
 def get_nearest_station(df: pd.DataFrame, station_df: pd.DataFrame) -> pd.DataFrame:
     """
     Assigns the nearest station code to each row using BallTree.
+    Optimized: Reduced object creation inside loops.
     """
     df = df.copy()
     
-    # 1. Pre-calculate station coordinates per district
-    # FIX: Added include_groups=False to silence FutureWarning
+    # Pre-calculate station coordinates per district
+    # include_groups=False silences Pandas FutureWarnings
     station_map = station_df.groupby('district')[['station_code', 'latitude', 'longitude']].apply(
-        lambda g: g.to_dict('records')
+        lambda g: g.to_dict('records'), 
+        include_groups=False
     ).to_dict()
 
     df['station_code'] = np.nan
@@ -71,23 +81,18 @@ def get_nearest_station(df: pd.DataFrame, station_df: pd.DataFrame) -> pd.DataFr
     # Convert all points to radians once
     df_rad = np.radians(df[['latitude', 'longitude']].to_numpy())
     
-    # Get unique districts present in the data to iterate over
-    # (Faster than iterating over the station map if data covers fewer districts)
+    # Iterate only over districts present in the data
     present_districts = df['district'].unique()
 
     for district in present_districts:
-        # Skip if this district has no stations
         if district not in station_map:
             continue
             
         stations = station_map[district]
-        
-        # Find rows belonging to this district
         mask = df['district'] == district
         idx = np.where(mask)[0]
         
-        if len(idx) == 0:
-            continue
+        if len(idx) == 0: continue
         
         if len(stations) == 1:
             df.loc[mask, 'station_code'] = stations[0]['station_code']
