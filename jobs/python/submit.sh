@@ -2,8 +2,4 @@
 export PYTHONPATH=$PYTHONPATH:/home/sirav/JekTurnRight_dsde
 
 # 2. Run the Job
-spark-submit \
-  --master local[2] \
-  --driver-memory 4g \
-  test_spark_cleaning.py
-  src/spark_jobs/traffy_etl_job.py
+python src/jobs/python/run_pipeline.py
