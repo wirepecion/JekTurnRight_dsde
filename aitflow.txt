@@ -1,0 +1,21 @@
+# 1. Ensure Airflow knows where to put files
+export AIRFLOW_HOME=~/airflow
+
+# 2. Build the tables (This is the missing step)
+airflow db migrate
+
+airflow users create \
+    --username admin \
+    --firstname Peter \
+    --lastname Parker \
+    --role Admin \
+    --email admin@gmail.com \
+    --password admin
+
+airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@gmail.com --password admin
+
+# Don't forget to export PYTHONPATH if you opened a new terminal
+export PYTHONPATH=$PYTHONPATH:.
+
+# Run the test
+airflow tasks test bangkok_flood_etl_daily run_spark_etl_job 2025-01-01
