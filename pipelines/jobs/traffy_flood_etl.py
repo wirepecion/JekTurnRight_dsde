@@ -1,6 +1,6 @@
 # pipelines/jobs/traffy_flood_etl.py
 from pyspark.sql import SparkSession
-from src.common.config import RAW_DIR, CLEANED_TRAFFY_PATH, FLOOD_TS_PATH
+from src.setting.config import RAW_DIR, CLEANED_TRAFFY_PATH, FLOOD_TS_PATH
 from src.de.spark_jobs.traffy_flood_etl import run_traffy_flood_etl
 
 

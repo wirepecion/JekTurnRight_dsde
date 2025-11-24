@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.common.config import RAW_DIR, EXTERNAL
+from src.setting.config import RAW_DIR, EXTERNAL
 from src.de.extract.web_scraper.station_name_scraping import parse_locations_file
 
 

@@ -1,6 +1,6 @@
 # pipelines/jobs/scrape_water_levels.py
 from pathlib import Path
-from src.common.config import EXTERNAL  # or PROCESSED_DIR, your choice
+from src.setting.config import EXTERNAL  # or PROCESSED_DIR, your choice
 from src.de.extract.web_scraper.water_level_scraper import scrape_range
 
 def main():

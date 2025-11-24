@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.common.config import RAW_DIR
+from src.setting.config import RAW_DIR
 from src.de.extract.download_traffy import download_from_gdrive
 
 FILE_ID = "19QkF8i1my99gjbyHe7de_qZNwgrca6R5"

@@ -1,5 +1,5 @@
-__all__ = ["ds", 'de', 'common', "dataprep"]
+__all__ = ["ds", 'de', 'setting', "dataprep"]
 from . import ds
 from . import de
-from . import common
+from . import setting
 from . import dataprep
