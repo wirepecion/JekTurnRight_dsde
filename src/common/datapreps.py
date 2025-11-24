@@ -13,7 +13,7 @@ def get_cleaned_data(file_path:str,shape_path:str,csv_to_check_shape_path:str = 
     raw_data = get_raw_data(file_path)
     return clean_data(raw_data,shape_path,csv_to_check_shape_path)
 
-def get_shape_file(file_path:str):
+def get_shape_file(file_path:str,check_path:str = None) -> gpd.GeoDataFrame:
     gdf = gpd.read_file(file_path)
     gdf.rename(columns={
         'SUBDISTRIC':'subdistrict_id',
@@ -23,6 +23,9 @@ def get_shape_file(file_path:str):
     	'CHANGWAT_N':'changwat',
     	'Shape_Area':'shape_area'
     },inplace=True)
+    if check_path is not None:
+        check_df = get_raw_data(check_path)
+        gdf =  verify_geopandas(gdf,check_df)
     gdf.drop(columns=['OBJECTID','AREA_CAL','AREA_BMA','PERIMETER',	'ADMIN_ID', 'CHANGWAT_I','Shape_Leng'],inplace=True)
     return gdf
 
@@ -35,13 +38,8 @@ def clean_data(df: pd.DataFrame,shape_path:str,csv_to_check_shape_path:str = Non
     df = filter_year(df,start=2022,stop=2024)
     df = drop_not_used_columns(df, cols=['photo', 'photo_after', 'star']) 
     df = drop_not_use_province(df)
-    
-    shape_gdf =get_shape_file(shape_path)
-    if(csv_to_check_shape_path is not None):
-        check_df = get_raw_data(csv_to_check_shape_path)
-        df = verify_coordination_with_address(df=df,verify_df=shape_gdf,check=check_df)
-    else:
-        df = verify_coordination_with_address(df=df,verify_df=shape_gdf)
+    shape_gdf = get_shape_file(shape_path,csv_to_check_shape_path) if csv_to_check_shape_path is not None else get_shape_file(shape_path)
+    df = verify_coordination_with_address(df=df,verify_df=shape_gdf)
     cleaned = clean_type_columns(df)      #Clean 'type' column
     
     return cleaned
@@ -158,10 +156,8 @@ def drop_not_use_province(df:pd.DataFrame) -> pd.DataFrame:
     return df
 
 #--------------------------------------------------------------------------------------------------------------
-def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame,check:pd.DataFrame=None) -> pd.DataFrame:
+def verify_coordination_with_address(df:pd.DataFrame,verify_df:gpd.GeoDataFrame) -> pd.DataFrame:
     df_points = gpd.GeoDataFrame(df,geometry=[Point(xy) for xy in zip(df['longitude'], df['latitude'])],crs="EPSG:4326")
-    if check is not None:
-        verify_df =verify_geopandas(verify_df,check)
     if verify_df.crs != "EPSG:4326":
         verify_df = verify_df.to_crs("EPSG:4326")
     joined = gpd.sjoin(df_points, verify_df, how="left", predicate="within")
