@@ -93,7 +93,7 @@ class FloodDataPipeline:
                 final_df.to_csv(self.cfg.output_path, index=False)
 
             logger.info(">>> Pipeline Finished Successfully.")
-            return final_df,df
+            return final_df
 
         except Exception as e:
             logger.error(f"!!! Pipeline Failed: {e}", exc_info=True)
