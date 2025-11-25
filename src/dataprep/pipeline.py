@@ -18,6 +18,7 @@ class PipelineConfig:
     station_path: str
     rain_path: str
     output_path: Optional[str] = None
+    check_path: Optional[str] = None
     year_start: int = 2022
     year_end: int = 2024
 
@@ -37,17 +38,23 @@ class FloodDataPipeline:
             shape_gdf = io.load_shapefile(self.cfg.shape_path)
             station_df = io.load_csv(self.cfg.station_path)
             rain_df = io.load_csv(self.cfg.rain_path)
+            if self.cfg.check_path is not None:
+                check_df = io.load_csv(self.cfg.check_path)
 
             # --- STEP 2: CLEAN ---
             logger.info(">>> [2/7] Cleaning Data...")
             # Clean Traffy
-            df = cleaning.drop_nan_rows(raw_traffy, ['coords', 'timestamp'])
+            df = cleaning.drop_nan_rows(raw_traffy, ['ticket_id', 'type', 'organization', 'coords', 'province', 'timestamp', 'last_activity'])
             df = cleaning.convert_types(df)
             df = cleaning.extract_time_features(df)
             df = df[(df['year_timestamp'] >= self.cfg.year_start) & (df['year_timestamp'] <= self.cfg.year_end)]
             df = cleaning.parse_coordinates(df)
             df = cleaning.clean_province_name(df)
             df = cleaning.parse_type_column(df)
+                
+            #Clean shape file
+            if self.cfg.check_path is not None:
+                shape_gdf = geo.verify_shape_gdf(shape_gdf,check_df)
             
             # Clean External
             station_df = mergers.clean_station_metadata(station_df)

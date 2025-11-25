@@ -17,8 +17,8 @@ def clean_station_metadata(df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_rainfall_data(df: pd.DataFrame) -> pd.DataFrame:
     """Cleans rainfall data and melts it from wide to long format."""
-    df = df.drop(columns=['NKM.03','LSI.02'], errors='ignore')
-    df = impute_missing(df, df.columns[df.isna().any()].tolist(), 'most_frequent')
+    df = df.drop(columns=['NKM.03','LSI.02','MBR.03','NJK.04','SPK.01'], errors='ignore')
+    df = impute_missing(df, df.columns[df.isna().any()].tolist(), strategy='most_frequent')
     df = df.rename(columns={'Date': 'date'})
     
     # Melt to long format

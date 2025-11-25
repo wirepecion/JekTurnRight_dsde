@@ -129,3 +129,15 @@ def get_subdistrict_centroids_visual(shape_gdf: gpd.GeoDataFrame) -> gpd.GeoData
         'latitude': centroids.y,
         'longitude': centroids.x
     })
+
+def verify_shape_gdf(shape_gdf:gpd.GeoDataFrame,check_df:pd.DataFrame)->gpd.GeoDataFrame:
+        shape_gdf['subdistrict_id'] =shape_gdf['subdistrict_id'].astype('int')
+        if(len(shape_gdf.loc[~shape_gdf['subdistrict'].isin(check_df['sname']),'subdistrict']) != 0):
+            subdistrict_dict = dict(zip(check_df['scode'], check_df['sname']))
+            shape_gdf['subdistrict'] = shape_gdf['subdistrict_id'].map(subdistrict_dict)
+        shape_gdf['district_id'] =shape_gdf['district_id'].astype('int')
+        
+        if(len(shape_gdf.loc[~shape_gdf['district'].isin(check_df['dname']),'district'])!=0): 
+            district_dict = dict(zip(check_df['dcode'], check_df['dname']))
+            shape_gdf['district'] = shape_gdf['district_id'].map(district_dict)
+        return shape_gdf
