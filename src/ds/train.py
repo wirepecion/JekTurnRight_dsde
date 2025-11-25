@@ -1,105 +1,34 @@
-"""
-src/ds/train.py
----------------
-Trains the FloodLSTM model using Spark-generated Parquet files.
-"""
+import pandas as pd
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 import json
-import pickle
-import logging
-import sys
 
-# Custom Imports
-from src.ds.dataset import FloodLSTMDataset
-from src.ds.model import FloodLSTM
+from model import FloodLSTM
+from data_utils import CONFIG, EarlyStopping, process_data, create_tensors, DS
+from pathlib import Path
+from src.setting.config import PROCESSED_DIR
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger("FloodTrainer")
+# DATA_PATH should be defined within train.py or passed as an argument
+DATA_PATH = "data/processed/flood_training_data_csv/part-00000-dc12f89c-7065-4d09-a951-dec13b2938ce-c000.csv"
 
-# --- CONFIGURATION ---
-CONFIG = {
-    "SEQ_LEN": 30,
-    "BATCH_SIZE": 64,
-    "HIDDEN_DIM": 64,
-    "LAYERS": 2,
-    "DROPOUT": 0.4,
-    "EPOCHS": 30,       # Reduced epochs for faster testing
-    "PATIENCE": 5,
-    "LR": 1e-3,
-    "WD": 1e-5,
-    "DEVICE": torch.device("cuda" if torch.cuda.is_available() else "cpu")
-}
 
-class EarlyStopping:
-    def __init__(self, patience=7, path='best_model.pth'):
-        self.patience = patience
-        self.counter = 0
-        self.best_loss = None
-        self.early_stop = False
-        self.path = path
-
-    def __call__(self, val_loss, model):
-        if self.best_loss is None:
-            self.best_loss = val_loss
-            self.save_checkpoint(model)
-        elif val_loss > self.best_loss:
-            self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_loss = val_loss
-            self.save_checkpoint(model)
-            self.counter = 0
-
-    def save_checkpoint(self, model):
-        torch.save(model.state_dict(), self.path)
-
-def train():
-    logger.info(">>> Phase 1: Loading Data...")
+if __name__ == "__main__":
+    print(">>> Phase 1: Training Started")
     
-    # Point to the FOLDER created by Spark
-    parquet_path = "data/processed/flood_training_data_spark"
-    
-    try:
-        # Initialize Dataset
-        full_dataset = FloodLSTMDataset(parquet_path, sequence_length=CONFIG["SEQ_LEN"])
-        
-        # Save Scaler (Critical for Inference!)
-        scaler = full_dataset.get_scaler()
-        with open("scaler.pkl", "wb") as f:
-            pickle.dump(scaler, f)
-        logger.info("✅ Saved scaler.pkl")
-            
-    except Exception as e:
-        logger.error(f"Failed to load data: {e}")
-        sys.exit(1)
+    # LOAD YOUR DATA HERE
+    df_full = pd.read_csv(DATA_PATH)
+    df_clean = process_data(df_full)
+    (X_tr, y_tr), (X_te, y_te), p_weight, input_dim = create_tensors(df_clean)
 
-    # Split Train/Test (80/20)
-    train_size = int(0.8 * len(full_dataset))
-    test_size = len(full_dataset) - train_size
-    train_ds, test_ds = random_split(full_dataset, [train_size, test_size])
+    tr_loader = DataLoader(DS(X_tr, y_tr), batch_size=CONFIG["BATCH_SIZE"], shuffle=True)
+    te_loader = DataLoader(DS(X_te, y_te), batch_size=CONFIG["BATCH_SIZE"], shuffle=False)
 
-    tr_loader = DataLoader(train_ds, batch_size=CONFIG["BATCH_SIZE"], shuffle=True)
-    te_loader = DataLoader(test_ds, batch_size=CONFIG["BATCH_SIZE"], shuffle=False)
-
-    # Init Model
-    input_dim = full_dataset.get_input_dim()
-    logger.info(f"Model Input Dimension: {input_dim}")
-    
     model = FloodLSTM(input_dim, CONFIG["HIDDEN_DIM"], CONFIG["LAYERS"], CONFIG["DROPOUT"]).to(CONFIG["DEVICE"])
     opt = torch.optim.Adam(model.parameters(), lr=CONFIG["LR"], weight_decay=CONFIG["WD"])
-    
-    # Loss Function
-    # Use 'pos_weight' here if floods are extremely rare (e.g., < 5%)
-    # pos_weight = torch.tensor([5.0]).to(CONFIG["DEVICE"])
-    # crit = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    crit = nn.BCEWithLogitsLoss()
-    
+    crit = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(p_weight).to(CONFIG["DEVICE"]))
     stop = EarlyStopping(patience=CONFIG["PATIENCE"])
 
-    logger.info(">>> Phase 2: Training Loop...")
     for ep in range(CONFIG["EPOCHS"]):
         model.train()
         t_loss = 0
@@ -118,24 +47,12 @@ def train():
                 X, y = X.to(CONFIG["DEVICE"]), y.to(CONFIG["DEVICE"])
                 v_loss += crit(model(X), y).item()
 
-        avg_t = t_loss / len(tr_loader)
-        avg_v = v_loss / len(te_loader)
-        print(f"Epoch {ep+1:02d}: Train {avg_t:.4f} | Val {avg_v:.4f}")
-        
-        stop(avg_v, model)
-        if stop.early_stop:
-            logger.info("Early stopping triggered.")
-            break
+        print(f"Epoch {ep+1:02d}: Train {t_loss/len(tr_loader):.4f} | Val {v_loss/len(te_loader):.4f}")
+        stop(v_loss/len(te_loader), model)
+        if stop.early_stop: break
 
-    # Save Configuration
-    model_config = {
-        "input_dim": input_dim, 
-        "hidden_dim": CONFIG["HIDDEN_DIM"], 
-        "num_layers": CONFIG["LAYERS"], 
-        "dropout": CONFIG["DROPOUT"]
-    }
-    with open("model_config.json", "w") as f: json.dump(model_config, f)
-    logger.info("✅ Training Complete. Artifacts saved.")
-
-if __name__ == "__main__":
-    train()
+    # Save
+    config = {"input_dim": input_dim, "hidden_dim": CONFIG["HIDDEN_DIM"], "num_layers": CONFIG["LAYERS"], "dropout": CONFIG["DROPOUT"]}
+    with open("config.json", "w") as f: json.dump(config, f)
+    torch.save(model.state_dict(), "pytorch_model.bin")
+    print("\u2705 Phase 1 Complete.")
