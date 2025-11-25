@@ -138,7 +138,7 @@ def main() -> None:
 
         df_clean = (
             df_raw
-            .transform(lambda df: cleaning.drop_nan_rows(df, ["coords", "timestamp"]))
+            .transform(lambda df: cleaning.drop_nan_rows(df, ['ticket_id', 'type', 'organization', 'coords', 'province', 'timestamp', 'last_activity']))
             .transform(cleaning.convert_types)
             .transform(cleaning.clean_province_name)
             .transform(cleaning.parse_type_column)

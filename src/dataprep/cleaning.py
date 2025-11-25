@@ -58,3 +58,42 @@ def impute_missing(df: pd.DataFrame, columns: list, strategy: str = 'most_freque
     imputer = SimpleImputer(strategy=strategy, fill_value=fill_value)
     df[columns] = imputer.fit_transform(df[columns])
     return df
+
+def build_flood_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Takes merged dataframe (reports × rainfall per subdistrict)
+    and constructs ML features:
+        • rainfall memory (API)
+        • seasonality
+        • binary flood target
+    """
+
+    # parse
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values(['subdistrict', 'date']).reset_index(drop=True)
+    df['date'] = pd.to_datetime(df['date'])
+
+    # rolling mean — physics inspired soil memory
+    for w in [30, 60, 90]:
+        df[f'API_{w}d'] = (
+            df.groupby('subdistrict')['rainfall']
+              .transform(lambda x: x.rolling(w, min_periods=1).mean())
+              .bfill()
+        )
+
+    # cyclic month embedding
+    df['month_timestamp'] = df['date'].dt.month
+    df['month_sin'] = np.sin(2*np.pi * df['month_timestamp']/12)
+    df['month_cos'] = np.cos(2*np.pi * df['month_timestamp']/12)
+
+    # binary flood label
+    if 'number_of_report_flood' in df.columns:
+        df['target'] = (df['number_of_report_flood'] > 0).astype(int)
+        df.drop(columns=['number_of_report_flood'], inplace=True)
+
+    # remove unused identifier columns if present
+    cols_to_drop = [col for col in ('district', 'station_code') if col in df.columns]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+
+    return df

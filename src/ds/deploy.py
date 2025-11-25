@@ -1,6 +1,7 @@
 from huggingface_hub import HfApi
 
 # import token from .env
+from src.setting.config import MODEL_DIR
 from dotenv import load_dotenv
 import os
 
@@ -11,12 +12,12 @@ def deploy():
     load_dotenv()
     token = os.getenv("HF_TOKEN")
 
-    files = ["pytorch_model.bin", "config.json", "scaler.pkl", "thresholds.json"]
+    files = [MODEL_DIR / "pytorch_model.bin", MODEL_DIR / "config.json", MODEL_DIR / "scaler.pkl", MODEL_DIR / "thresholds.json"]
 
     for f in files:
         if os.path.exists(f):
             print(f"   Uploading {f}...")
-            api.upload_file(path_or_fileobj=f, path_in_repo=f, repo_id=repo_id, token=token)
+            api.upload_file(path_or_fileobj=f, path_in_repo=f.name, repo_id=repo_id, token=token)
         else:
             print(f"\u274C Missing {f}. Did you run Phases 1 & 2?")
 

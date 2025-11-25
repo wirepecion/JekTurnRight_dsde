@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
-from src.setting.config import PROCESSED_DIR
+from src.setting.config import PROCESSED_DIR, MODEL_DIR
 import pickle
 import json
 import os
@@ -25,7 +25,7 @@ CONFIG = {
 
 # --- UTILITIES ---
 class EarlyStopping:
-    def __init__(self, patience=7, path='best_model.pth'):
+    def __init__(self, patience=7, path=MODEL_DIR / 'best_model.pth'):
         self.patience = patience
         self.counter = 0
         self.best_loss = None
@@ -48,48 +48,6 @@ class EarlyStopping:
     def save_checkpoint(self, model):
         torch.save(model.state_dict(), self.path)
 
-# --- ETL ---
-def process_data(df):
-    df = df.copy()
-
-    # Normalize Column Names
-    df = df.rename(columns={
-        'Date': 'date',
-        'Latitude': 'latitude',
-        'Longitude': 'longitude',
-        'water' : 'rainfall'
-    })
-
-    # Parse Date 
-    df['date'] = pd.to_datetime(df['date'])
-
-    # Sort as Time Series
-    df = df.sort_values(['subdistrict', 'date']).reset_index(drop=True)
-
-    # Physics Features (Soil Memory)
-    for w in [30, 60, 90]:
-        col = f'API_{w}d'
-        df[col] = df.groupby('subdistrict')['rainfall'].transform(
-            lambda x: x.rolling(w, min_periods=1).mean()
-        ).bfill()
-
-    # Extract Components for Seasonality
-    df['month_timestamp'] = df['date'].dt.month
-
-    df['month_sin'] = np.sin(2 * np.pi * df['month_timestamp'] / 12)
-    df['month_cos'] = np.cos(2 * np.pi * df['month_timestamp'] / 12)
-
-    # Target
-    if 'number_of_report_flood' in df.columns:
-        df['target'] = (df['number_of_report_flood'] > 0).astype(int)
-
-    # Drop Unused Columns
-    if 'district' in df.columns:
-        cols = ['district']
-        df = df.drop(columns=cols)
-
-    return df
-
 def create_tensors(df):
     cutoff = pd.Timestamp("2024-01-01")
     train_df = df[df['date'] < cutoff].copy()
@@ -103,7 +61,7 @@ def create_tensors(df):
     train_df[features] = scaler.fit_transform(train_df[features])
     test_df[features] = scaler.transform(test_df[features])
 
-    with open("scaler.pkl", "wb") as f: pickle.dump(scaler, f)
+    with open(MODEL_DIR / "scaler.pkl", "wb") as f: pickle.dump(scaler, f)
 
     def _slide(sub_df):
         X, y = [], []

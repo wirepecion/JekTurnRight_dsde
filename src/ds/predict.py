@@ -7,34 +7,19 @@ import os
 from huggingface_hub import hf_hub_download
 import numpy as np
 
-from model import FloodLSTM
-from data_utils import CONFIG
+from src.ds.models import FloodLSTM
+from src.ds.utils import CONFIG
+from src.setting.config import PROCESSED_DIR, MODEL_DIR
 
 def run_forecast(csv_path, repo_id="sirasira/flood-lstm-v1", burn_in=90):
     print(f""">>> \u2728 Starting Forecast on {csv_path}...""")
 
-    # --- A. Download Resources ---
-    print("     >>> Syncing with Hugging Face Hub...")
-    try:
-        files = ["scaler.pkl", "config.json", "pytorch_model.bin", "thresholds.json"]
-        paths = {}
-        for f in files:
-            paths[f] = hf_hub_download(repo_id=repo_id, filename=f)
-    except Exception as e:
-        return f"\u274C Error downloading resources: {e}"
+    # --- A. Load Model ---
+    print("     >>> Load model from Hugging Face Hub")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model, scaler, thresh = FloodLSTM.load_from_hub(repo_id=repo_id, device=device)
 
-    # --- B. Load Artifacts ---
-    with open(paths["scaler.pkl"], "rb") as f: scaler = pickle.load(f)
-    with open(paths["config.json"], "r") as f: conf = json.load(f)
-    with open(paths["thresholds.json"], "r") as f: thresh = json.load(f)
-
-    # Load Model
-    device = torch.device("cpu")
-    model = FloodLSTM(conf["input_dim"], conf["hidden_dim"], conf["num_layers"], conf["dropout"])
-    model.load_state_dict(torch.load(paths["pytorch_model.bin"], map_location=device))
-    model.eval()
-
-    # --- C. Load & ETL Data ---
+    # --- B. Load & ETL Data ---
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
@@ -55,7 +40,7 @@ def run_forecast(csv_path, repo_id="sirasira/flood-lstm-v1", burn_in=90):
     df['month_sin'] = np.sin(2 * np.pi * df['month_timestamp'] / 12)
     df['month_cos'] = np.cos(2 * np.pi * df['month_timestamp'] / 12)
 
-    # --- D. Prediction Loop ---
+    # --- C. Prediction Loop ---
     features = ['rainfall', 'total_report', 'API_30d', 'API_60d', 'API_90d', 'month_sin', 'month_cos', 'latitude', 'longitude']
     SEQ_LEN = CONFIG["SEQ_LEN"]
     results = []
@@ -103,8 +88,8 @@ def run_forecast(csv_path, repo_id="sirasira/flood-lstm-v1", burn_in=90):
 if __name__ == "__main__":
 
     # Change this to your input filename
-    INPUT_FILE = "/content/test_set.csv"
-    OUTPUT_FILE = "2024_forecast.csv"
+    INPUT_FILE = PROCESSED_DIR / "test_set.csv"
+    OUTPUT_FILE = MODEL_DIR / "2024_forecast.csv"
 
     df_result = run_forecast(INPUT_FILE)
 

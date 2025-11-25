@@ -1,30 +1,20 @@
 import pandas as pd
 import torch
-import torch.nn as nn
-import pickle
-import json
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, fbeta_score, ConfusionMatrixDisplay
-from huggingface_hub import hf_hub_download
-import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix, fbeta_score
+from src.setting.config import PROCESSED_DIR
 
 # Import model class
-from model import FloodLSTM
+from src.ds.models import FloodLSTM
 
-# --- 2. VALIDATION ENGINE ---
-def run_validation(test_csv_path="/content/test_set.csv", repo_id="sirasira/flood-lstm-v1"):
+# ---  VALIDATION ENGINE ---
+
+def run_validation(test_csv_path= PROCESSED_DIR / "test_set.csv", repo_id="sirasira/flood-lstm-v1"):
     print(f""">>>  Starting Backtest Validation on {test_csv_path}""")
 
-    # A. Download Resources
+    # A. Load Model & Artifacts
     print("     >>> Syncing artifacts from Hugging Face Hub")
-    scaler = pickle.load(open(hf_hub_download(repo_id, "scaler.pkl"), "rb"))
-    config = json.load(open(hf_hub_download(repo_id, "config.json"), "r"))
-    weights = torch.load(hf_hub_download(repo_id, "pytorch_model.bin"), map_location="cpu")
-    thresh_config = json.load(open(hf_hub_download(repo_id, "thresholds.json"), "r"))
-
-    model = FloodLSTM(config["input_dim"], config["hidden_dim"], config["num_layers"], config["dropout"])
-    model.load_state_dict(weights)
-    model.eval()
+    model, scaler, thresh_config = FloodLSTM.load_from_hub(repo_id=repo_id, device="cuda" if torch.cuda.is_available() else "cpu")
 
     # B. Load Data
     df = pd.read_csv(test_csv_path)
@@ -122,13 +112,6 @@ def run_validation(test_csv_path="/content/test_set.csv", repo_id="sirasira/floo
     f2 = fbeta_score(y_true_all, y_pred_all, beta=2)
     print(f"\n📰 Safety Score (F2): {f2:.4f}")
     print("="*60)
-
-    # Plot confusion matrix
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["No Flood", "Flood"])
-    disp.plot(cmap=plt.cm.Blues)
-    plt.title("Confusion Matrix")
-    plt.show()
-
 
 if __name__ == "__main__":
     run_validation()

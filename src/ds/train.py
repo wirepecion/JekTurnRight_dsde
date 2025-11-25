@@ -4,13 +4,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import json
 
-from model import FloodLSTM
-from data_utils import CONFIG, EarlyStopping, process_data, create_tensors, DS
+from src.ds.models import FloodLSTM
+from src.ds.utils import CONFIG, EarlyStopping, create_tensors, DS
 from pathlib import Path
-from src.setting.config import PROCESSED_DIR
+from src.setting.config import PROCESSED_DIR, MODEL_DIR
 
 # DATA_PATH should be defined within train.py or passed as an argument
-DATA_PATH = "data/processed/flood_training_data_csv/part-00000-dc12f89c-7065-4d09-a951-dec13b2938ce-c000.csv"
+DATA_PATH = "data/processed/clean_flood_data.csv"
 
 
 if __name__ == "__main__":
@@ -18,8 +18,10 @@ if __name__ == "__main__":
     
     # LOAD YOUR DATA HERE
     df_full = pd.read_csv(DATA_PATH)
-    df_clean = process_data(df_full)
-    (X_tr, y_tr), (X_te, y_te), p_weight, input_dim = create_tensors(df_clean)
+    # handle date parsing and sorting
+    df_full['date'] = pd.to_datetime(df_full['date'])
+    df_full = df_full.sort_values(['subdistrict', 'date']).reset_index(drop=True)
+    (X_tr, y_tr), (X_te, y_te), p_weight, input_dim = create_tensors(df_full)
 
     tr_loader = DataLoader(DS(X_tr, y_tr), batch_size=CONFIG["BATCH_SIZE"], shuffle=True)
     te_loader = DataLoader(DS(X_te, y_te), batch_size=CONFIG["BATCH_SIZE"], shuffle=False)
@@ -53,6 +55,6 @@ if __name__ == "__main__":
 
     # Save
     config = {"input_dim": input_dim, "hidden_dim": CONFIG["HIDDEN_DIM"], "num_layers": CONFIG["LAYERS"], "dropout": CONFIG["DROPOUT"]}
-    with open("config.json", "w") as f: json.dump(config, f)
-    torch.save(model.state_dict(), "pytorch_model.bin")
+    with open(MODEL_DIR / "config.json", "w") as f: json.dump(config, f)
+    torch.save(model.state_dict(), MODEL_DIR / "pytorch_model.bin")
     print("\u2705 Phase 1 Complete.")

@@ -37,7 +37,7 @@ DATA_DIR: Path = PROJECT_ROOT / "data"
 RAW_DIR: Path = DATA_DIR / "raw"
 PROCESSED_DIR: Path = DATA_DIR / "processed"
 EXTERNAL: Path = DATA_DIR / "external"
-OUTPUT_DIR: Path = DATA_DIR / "output"
+MODEL_DIR: Path = DATA_DIR / "model"
 
 CLEANED_TRAFFY_PATH: Path = PROCESSED_DIR / "traffy_clean.parquet"
 FLOOD_TS_PATH: Path = PROCESSED_DIR / "flood_daily_by_district.parquet"

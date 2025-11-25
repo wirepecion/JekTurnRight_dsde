@@ -87,7 +87,11 @@ class FloodDataPipeline:
                 report_df=df
             )
 
-            # --- STEP 7: SAVE ---
+            # --- STEP 7: FEATURE ENGINEERING ---
+            logger.info(">>> [7/8] Generating ML features...")
+            final_df = cleaning.build_flood_features(final_df)
+
+            # --- STEP 8: SAVE ---
             if self.cfg.output_path:
                 logger.info(f"Saving result to {self.cfg.output_path}")
                 final_df.to_csv(self.cfg.output_path, index=False)
