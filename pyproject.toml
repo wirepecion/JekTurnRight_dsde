@@ -22,6 +22,9 @@ dev = [
     "ruff>=0.1.0",
 ]
 
+[project.scripts]
+traffy-etl = "src.de.spark_jobs.traffy_etl_job:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -1,185 +1,119 @@
-"""
-src/ds/predict.py
------------------
-Inference Engine for User Uploads.
-Handles:
-1. Column Mapping (rain_fall -> rainfall)
-2. Feature Engineering on-the-fly (Seasonality, API)
-3. Model Prediction
-"""
-import torch
 import pandas as pd
-import numpy as np
+import torch
+import torch.nn as nn
 import pickle
 import json
-import logging
-from src.ds.model import FloodLSTM
+import os
+from huggingface_hub import hf_hub_download
+import numpy as np
 
-# Setup Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger("Predictor")
+from model import FloodLSTM
+from data_utils import CONFIG
 
-class FloodPredictor:
-    def __init__(self, model_dir="."):
-        """
-        Loads Model, Config, and Scaler from the directory.
-        """
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        # 1. Load Config
-        try:
-            with open(f"{model_dir}/model_config.json", "r") as f:
-                self.config = json.load(f)
-            
-            # 2. Load Scaler
-            with open(f"{model_dir}/scaler.pkl", "rb") as f:
-                self.scaler = pickle.load(f)
-                
-            # 3. Load Model
-            self.model = FloodLSTM(
-                self.config["input_dim"], 
-                self.config["hidden_dim"], 
-                self.config["num_layers"], 
-                self.config["dropout"]
-            ).to(self.device)
-            
-            self.model.load_state_dict(torch.load(f"{model_dir}/best_model.pth", map_location=self.device))
-            self.model.eval()
-            logger.info("✅ Model loaded successfully.")
-            
-        except FileNotFoundError as e:
-            logger.error(f"Missing artifact: {e}. Did you train the model?")
-            raise e
+def run_forecast(csv_path, repo_id="sirasira/flood-lstm-v1", burn_in=90):
+    print(f""">>> \u2728 Starting Forecast on {csv_path}...""")
 
-    def preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transforms User CSV format into Model Features.
-        """
-        df = df.copy()
-        
-        # A. Column Mapping (User Input -> Model Name)
-        rename_map = {
-            'rain_fall': 'rainfall',
-            # Add others if names differ, e.g. 'sub_district' -> 'subdistrict'
-        }
-        df = df.rename(columns=rename_map)
-        
-        # B. Date Construction
-        try:
-            df['date'] = pd.to_datetime(dict(
-                year=df.year_timestamp, 
-                month=df.month_timestamp, 
-                day=df.days_timestamp
-            ))
-        except Exception as e:
-            logger.error(f"Date parsing failed: {e}")
-            raise ValueError("Invalid Date Columns")
+    # --- A. Download Resources ---
+    print("     >>> Syncing with Hugging Face Hub...")
+    try:
+        files = ["scaler.pkl", "config.json", "pytorch_model.bin", "thresholds.json"]
+        paths = {}
+        for f in files:
+            paths[f] = hf_hub_download(repo_id=repo_id, filename=f)
+    except Exception as e:
+        return f"\u274C Error downloading resources: {e}"
 
-        # C. Sort (Critical for rolling windows)
-        df = df.sort_values(['subdistrict', 'date']).reset_index(drop=True)
+    # --- B. Load Artifacts ---
+    with open(paths["scaler.pkl"], "rb") as f: scaler = pickle.load(f)
+    with open(paths["config.json"], "r") as f: conf = json.load(f)
+    with open(paths["thresholds.json"], "r") as f: thresh = json.load(f)
 
-        # D. Handle Missing "History" Features
-        # The model expects 'number_of_report_flood' (Autoregression).
-        # If user doesn't provide it, we assume 0 (No current flood).
-        if 'number_of_report_flood' not in df.columns:
-            df['number_of_report_flood'] = 0
+    # Load Model
+    device = torch.device("cpu")
+    model = FloodLSTM(conf["input_dim"], conf["hidden_dim"], conf["num_layers"], conf["dropout"])
+    model.load_state_dict(torch.load(paths["pytorch_model.bin"], map_location=device))
+    model.eval()
 
-        # E. Feature Engineering 1: Seasonality
-        df['month_sin'] = np.sin(2 * np.pi * df['month_timestamp'] / 12)
-        df['month_cos'] = np.cos(2 * np.pi * df['month_timestamp'] / 12)
+    # --- C. Load & ETL Data ---
+    try:
+        df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        return f"\u274C Error: Input file '{csv_path}' not found."
 
-        # F. Feature Engineering 2: Soil Memory (API)
-        # Logic: If user uploads 1 row, rolling window fails. We fill with 0.
-        for w in [30, 60, 90]:
-            col_name = f'API_{w}d'
-            # We use min_periods=1 so it works even with just 1 day of data
-            df[col_name] = df.groupby('subdistrict')['rainfall'].transform(
-                lambda x: x.rolling(w, min_periods=1).mean()
-            ).fillna(0.0)
+    # Date & Sort
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values(['subdistrict', 'date']).reset_index(drop=True)
 
-        return df
+    # Physics Features (API)
+    print("     >>> Calculating Physics Features...")
+    for w in [30, 60, 90]:
+        col = f'API_{w}d'
+        df[col] = df.groupby('subdistrict')['rainfall'].transform(lambda x: x.rolling(w, min_periods=1).mean()).bfill()
 
-    def predict(self, csv_path: str):
-        logger.info(f"Processing file: {csv_path}")
-        
-        # 1. Read & Clean
-        raw_df = pd.read_csv(csv_path)
-        clean_df = self.preprocess(raw_df)
-        
-        # 2. Define Features (Must match Training EXACTLY)
-        feature_cols = [
-            'rainfall', 'total_report', 'number_of_report_flood',
-            'API_30d', 'API_60d', 'API_90d',
-            'month_sin', 'month_cos',
-            'latitude', 'longitude'
-        ]
-        
-        # 3. Scale
-        # Warning: If scaler expects columns in specific order, we must enforce it
-        X_scaled = self.scaler.transform(clean_df[feature_cols])
-        
-        # 4. Inference Loop
-        results = []
-        seq_len = self.config["SEQ_LEN"] # usually 30
-        
-        # We group by subdistrict to handle multiple locations in one file
-        for name, group in clean_df.groupby('subdistrict'):
-            # Check if we have enough data for a full sequence
-            data = group[feature_cols].values # Get scaled values? NO! scaler returns numpy array
-            
-            # Correct way: Grab the slice from X_scaled corresponding to this group
-            indices = group.index
-            group_scaled = X_scaled[indices]
-            
-            if len(group) < seq_len:
-                # Cold Start Strategy: Pad with zeros if user provided < 30 days
-                # Create a buffer of zeros
-                padding = np.zeros((seq_len - len(group), len(feature_cols)))
-                # Stack padding + actual data
-                sequence = np.vstack([padding, group_scaled])
-            else:
-                # Take the LAST 'seq_len' days (Forecast based on latest data)
-                sequence = group_scaled[-seq_len:]
-            
-            # Convert to Tensor (Batch Size = 1)
-            X_tensor = torch.tensor(sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
-            
-            # Predict
+    # Seasonality Features
+    df['month_timestamp'] = df['date'].dt.month
+    df['month_sin'] = np.sin(2 * np.pi * df['month_timestamp'] / 12)
+    df['month_cos'] = np.cos(2 * np.pi * df['month_timestamp'] / 12)
+
+    # --- D. Prediction Loop ---
+    features = ['rainfall', 'total_report', 'API_30d', 'API_60d', 'API_90d', 'month_sin', 'month_cos', 'latitude', 'longitude']
+    SEQ_LEN = CONFIG["SEQ_LEN"]
+    results = []
+
+    print("    🔮 Running Inference...")
+    for sub, g in df.groupby('subdistrict'):
+        if len(g) <= burn_in:
+            print(f"    \u26A0\ufe0f Skipping {sub}: Not enough data for burn-in ({len(g)} rows).")
+            continue
+
+        # Scale Group
+        g_scaled = g.copy()
+        g_scaled[features] = scaler.transform(g[features])
+        vals = g_scaled[features].values
+        dates = g['date'].values
+        months = g['month_timestamp'].values
+
+        # Start predicting AFTER the burn-in period
+        for i in range(burn_in, len(g)):
+            seq_start = i - SEQ_LEN
+            if seq_start < 0: continue
+
+            # Create Tensor
+            X_ts = torch.FloatTensor(vals[seq_start:i]).unsqueeze(0).to(device)
+
+            # Forward Pass
             with torch.no_grad():
-                logits = self.model(X_tensor)
-                prob = torch.sigmoid(logits).item()
-            
-            # Decision (Using generic 0.5 threshold or your Optuna one)
-            status = "🚨 FLOOD RISK" if prob > 0.5 else "✅ Safe"
-            
-            results.append({
-                "subdistrict": name,
-                "date": str(group['date'].iloc[-1].date()),
-                "rain_today": group['rainfall'].iloc[-1],
-                "risk_score": f"{prob:.1%}",
-                "prediction": status
-            })
-            
-        return pd.DataFrame(results)
+                prob = torch.sigmoid(model(X_ts)).item()
 
-# --- USAGE EXAMPLE ---
+            # Apply Dynamic Threshold
+            current_month = months[i]
+            is_wet = 5 <= current_month <= 10
+            limit = thresh["wet"] if is_wet else thresh["dry"]
+
+            results.append({
+                "date": str(pd.Timestamp(dates[i]).date()),
+                "location": sub,
+                "risk_score": f"{prob:.2%}",
+                "status": "\u26A0\ufe0f FLOOD" if prob > limit else "\u2705 Safe",
+                "threshold_used": f"{limit:.3f}"
+            })
+
+    return pd.DataFrame(results)
+
 if __name__ == "__main__":
-    # Generate a dummy file to test
-    dummy_data = {
-        "year_timestamp": [2025, 2025],
-        "month_timestamp": [10, 10],
-        "days_timestamp": [2, 3],
-        "subdistrict": ["Lat Krabang", "Lat Krabang"],
-        "rain_fall": [1.5, 50.2],
-        "total_report": [5.0, 12.0],
-        "latitude": [13.72, 13.72],
-        "longitude": [100.75, 100.75] # Corrected Lon for Lat Krabang
-    }
-    pd.DataFrame(dummy_data).to_csv("user_upload_test.csv", index=False)
-    
-    # Run Prediction
-    predictor = FloodPredictor()
-    result = predictor.predict("user_upload_test.csv")
-    
-    print("\n=== 🔮 FORECAST RESULTS ===")
-    print(result)
+
+    # Change this to your input filename
+    INPUT_FILE = "/content/test_set.csv"
+    OUTPUT_FILE = "2024_forecast.csv"
+
+    df_result = run_forecast(INPUT_FILE)
+
+    if isinstance(df_result, pd.DataFrame):
+        if not df_result.empty:
+            print(f"\n>>> \u2705 Forecast Complete! Saving to {OUTPUT_FILE}")
+            print(df_result.tail()) 
+            df_result.to_csv(OUTPUT_FILE, index=False)
+        else:
+            print(">>> \u26A0\ufe0f No predictions made. Check input data length.")
+    else:
+        print(df_result) 
