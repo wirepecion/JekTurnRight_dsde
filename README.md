@@ -1,6 +1,8 @@
 # JekTurnRight_dsde
 
-A Data Science and Data Engineering repository using `uv` for package management with a `src/` layout.
+External Repo :
+Huggingface Model : https://huggingface.co/sirasira/flood-lstm-v1/tree/main
+FASTAPI (Huggingface Space) : https://huggingface.co/spaces/sirasira/bangkok-flood-api/blob/main/app.py
 
 ## Make Ikernel
 ```bash
