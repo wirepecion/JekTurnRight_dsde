@@ -1,6 +1,6 @@
 from pathlib import Path
 from src.setting.config import RAW_DIR, EXTERNAL
-from src.de.extract.web_scraper.station_name_scraping import parse_locations_file
+from scrapers.water_level.station_name_scraping import parse_locations_file
 
 
 def main() -> None:
@@ -8,7 +8,7 @@ def main() -> None:
     input_path = RAW_DIR / "bma_rain_station_js_array.txt"
 
     # Where you want to save cleaned metadata
-    output_path = EXTERNAL / "station_metadata.csv"
+    output_path = EXTERNAL / "station.csv"
 
     print(f"[StationMetadata] Reading raw JS array from: {input_path}")
     station_df = parse_locations_file(input_path)
@@ -24,5 +24,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-# uv run python -m pipelines.jobs.station_name_scraping

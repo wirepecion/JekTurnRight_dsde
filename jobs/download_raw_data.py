@@ -10,4 +10,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# uv run python -m pipelines.jobs.download_raw_data

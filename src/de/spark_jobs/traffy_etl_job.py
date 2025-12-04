@@ -246,8 +246,6 @@ def main() -> None:
         print("\n--- FINAL SCHEMA ---")
         df_final.printSchema()
 
-        logger.info(">>> JOB SUCCESS. I AM THE BOSS.")
-
     except Exception as e:
         logger.error(f"!!! JOB FAILED: {e}", exc_info=True)
         sys.exit(1)

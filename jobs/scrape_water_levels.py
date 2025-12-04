@@ -1,8 +1,7 @@
 # pipelines/jobs/scrape_water_levels.py
 from pathlib import Path
 from src.setting.config import EXTERNAL  # or PROCESSED_DIR, your choice
-from src.de.extract.web_scraper.water_level_scraper import scrape_range
-
+from scrapers.water_level.water_level_scraper import scrape_range
 def main():
     start = "01/01/2022"
     end = "10/01/2022"
@@ -16,5 +15,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# uv run python -m pipelines.jobs.scrape_water_levels
