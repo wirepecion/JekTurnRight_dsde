@@ -5,4 +5,4 @@ export PYTHONPATH=$PYTHONPATH:/home/sirav/JekTurnRight_dsde
 spark-submit \
   --master local[*] \
   --driver-memory 4g \
-  src/spark_jobs/traffy_etl_job.py
+  jobs/spark/traffy_etl_job.py

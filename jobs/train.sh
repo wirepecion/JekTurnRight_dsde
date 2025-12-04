@@ -60,12 +60,12 @@ echo "==> Starting training pipeline: $(date)"
 run_cmd python3 -m src.ds.train
 
 # 2) Tune threshold (try common spelling variations)
-if run_cmd python3 -m src.ds tune_threshold; then
+if run_cmd python3 -m src.ds tune_thresholds; then
     :
-elif run_cmd python3 -m src.ds tune_thresould; then
+elif run_cmd python3 -m src.ds tune_thresholds; then
     :
 else
-    echo "ERROR: threshold tuning command failed (tried tune_threshold and tune_thresould)"
+    echo "ERROR: threshold tuning command failed (tried tune_threshold and tune_thresholds)"
     exit 2
 fi
 
