@@ -207,7 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 # Data directories
-data/raw/*
+data/raw/bangkok_traffy.csv
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
