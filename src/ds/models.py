@@ -14,7 +14,7 @@ class FloodLSTM(nn.Module, PyTorchModelHubMixin):
         h0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
         c0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
         out, _ = self.lstm(x, (h0, c0))
-        return self.fc(out[:, -1, :]).squeeze()
+        return self.fc(out[:, -1, :])
     
     @property
     def hub_model_id(self) -> str:

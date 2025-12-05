@@ -9,18 +9,39 @@ import pickle
 import json
 import os
 
+# if data/model/config.json exists, load it
+config_path = MODEL_DIR / "config.json"
+if config_path.exists():
+    with open(config_path, "r") as f:
+        conf = json.load(f)
+        # rename keys to match hidden_dim -> HIDDEN_DIM
+        conf = {
+            "BATCH_SIZE": conf.get("batch_size", 32),
+            "HIDDEN_DIM": conf.get("hidden_dim", 128),
+            "LAYERS": conf.get("num_layers", 1),
+            "DROPOUT": conf.get("dropout", 0.21124221108682828),
+            "LR": conf.get("lr", 0.0002727427325885252),
+        }
+else:
+    conf = {
+        "BATCH_SIZE": 32,
+        "HIDDEN_DIM": 128,
+        "LAYERS": 1,
+        "DROPOUT": 0.21124221108682828,
+        "LR": 0.0002727427325885252,
+    }
 # --- CONFIGURATION ---
 CONFIG = {
-    "SEQ_LEN": 30,
-    "BATCH_SIZE": 64,
-    "HIDDEN_DIM": 64,
-    "LAYERS": 2,
-    "DROPOUT": 0.4,
-    "EPOCHS": 50,
-    "PATIENCE": 7,
-    "LR": 1e-3,
-    "WD": 1e-5,
-    "DEVICE": torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        "SEQ_LEN": 30,
+        "BATCH_SIZE": conf.get("BATCH_SIZE", 32),
+        "HIDDEN_DIM": conf.get("HIDDEN_DIM", 128),
+        "LAYERS": conf.get("LAYERS", 1),
+        "DROPOUT": conf.get("DROPOUT", 0.21124221108682828),
+        "EPOCHS": 50,
+        "PATIENCE": 7,
+        "LR": conf.get("LR", 0.0002727427325885252),
+        "WD": 1e-5,
+        "DEVICE": torch.device("cuda" if torch.cuda.is_available() else "cpu")
 }
 
 # --- UTILITIES ---
