@@ -26,3 +26,6 @@ export PYTHONPATH=$PYTHONPATH:.
 python3 etl_driver.py --engine "$ENGINE"
 
 echo ">>> [SUCCESS] Pipeline Finished."
+
+# pip install -r requirements.txt --force-reinstall
+# pip freeze > requirements.txt
