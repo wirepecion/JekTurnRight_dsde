@@ -1,7 +1,7 @@
 [project]
 name = "jekturnright-dsde"
 version = "0.1.0"
-description = "Data Science and Data Engineering repository with uv"
+description = "Data Science and Data Engineering repository"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
     "gdown",
     "pytest",
     "geopandas",
+    "folium",
+    "matplotlib",
+    "python-dotenv"
 ]
 
 [project.optional-dependencies]
@@ -20,9 +23,11 @@ dev = [
     "pytest>=7.4.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "ipykernel"
 ]
 
 [project.scripts]
+# Defines the command 'traffy-etl' to run your spark job
 traffy-etl = "src.de.spark_jobs.traffy_etl_job:main"
 
 [build-system]
