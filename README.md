@@ -1,123 +1,128 @@
 # JekTurnRight_dsde
 
-External Repo :
-Huggingface Model : https://huggingface.co/sirasira/flood-lstm-v1/tree/main
-FASTAPI (Huggingface Space) : https://huggingface.co/spaces/sirasira/bangkok-flood-api/blob/main/app.py
+**External Resources:**
+* **Visualization Dashboard:** [JekTurnRight_dsde_visualize](https://github.com/ahpu9158/JekTurnRight_dsde_visualize)
+* **HuggingFace Model:** [sirasira/flood-lstm-v1](https://huggingface.co/sirasira/flood-lstm-v1/tree/main)
+* **FASTAPI (HF Space):** [bangkok-flood-api](https://huggingface.co/spaces/sirasira/bangkok-flood-api/blob/main/app.py)
 
-## Make Ikernel
-```bash
-uv venv .venv
-source .venv/bin/activate          # or .venv\Scripts\activate on Windows
-uv pip install -e .
-uv pip install ipykernel
-python -m ipykernel install --user --name traffy-dsde
-```
+---
 
 ## Project Structure
 
-```
+```text
 .
+├── config/               # Configuration files (e.g., logging)
 ├── data/
-│   ├── raw/              # Raw data files (excluded from git)
-│   └── processed/        # Processed data files (excluded from git)
-├── notebooks/            # Jupyter notebooks for exploration
-├── src/
-│   ├── ds/              # Data Science modules
-│   ├── de/              # Data Engineering modules
-│   │   ├── extract/
-│   │   │   └── web_scraper/  # Web scraping utilities
-│   │   ├── transform/        # Data transformation logic
-│   │   ├── load/            # Data loading utilities
-│   │   └── spark_jobs/      # PySpark ETL jobs
-│   └── common/          # Shared utilities
-├── pipelines/
-│   └── jobs/            # Pipeline job definitions
-├── tests/               # Test files
-└── pyproject.toml       # Project configuration and dependencies
+│   ├── external/         # Rainfall and station reference data
+│   ├── model/            # Trained model artifacts (.pth, .bin, metrics)
+│   ├── processed/        # Cleaned data and Spark outputs (parquet/csv)
+│   └── raw/              # Raw Shapefiles (BMA) and scraped CSVs
+├── jobs/                 # Orchestration scripts (Download, Pipeline, Scrapers)
+├── notebooks/            # Jupyter notebooks for Analysis & Experiments
+├── scrapers/             # Specific scraper logic
+│   ├── traffy/           # Traffy Fondue data downloader
+│   └── water_level/      # Water level station scrapers
+├── src/                  # Main Source Code Package
+│   ├── dataprep/         # Data cleaning, geo-processing, and I/O
+│   ├── de/               # Data Engineering (Spark jobs & sessions)
+│   ├── ds/               # Data Science (Training, Prediction, Deployment)
+│   └── setting/          # Project-wide settings
+├── tests/                # Unit tests
+├── etl_driver.py         # Main entry point for ETL operations
+├── init.sh               # Setup script (venv creation & installation)
+├── submit_job.sh         # Pipeline orchestrator script
+├── requirements.txt      # Python dependencies
+└── pyproject.toml        # Project configuration
 ```
 
-## Setup with uv
+## Setup Environment
 
-### Install uv
+We provide a convenience script to set up the environment automatically.
 
-If you don't have `uv` installed, install it using one of these methods:
+### 1\. Run Initialization Script
+
+This script creates a virtual environment (`venv`) and installs all required dependencies.
 
 ```bash
-# On macOS and Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Make the script executable (if needed)
+chmod +x init.sh
 
-# On Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Using pip
-pip install uv
+# Run setup
+./init.sh
 ```
 
-### Create Virtual Environment and Install Dependencies
+### 2\. Activate Environment
+
+**Important:** You must activate the virtual environment manually every time you open a new terminal.
 
 ```bash
-# Create a virtual environment
-uv venv
+# On macOS and Linux:
+source venv/bin/activate
 
-# Activate the virtual environment
-# On macOS/Linux:
-source .venv/bin/activate
 # On Windows:
-.venv\Scripts\activate
-
-# Install project dependencies
-uv pip install -e .
-
-# Install development dependencies (optional)
-uv pip install -e ".[dev]"
+venv\Scripts\activate
 ```
 
-### Alternative: Use uv without explicit venv activation
+### 3\. Setup Jupyter Kernel
 
-`uv` can manage the virtual environment automatically:
+To use this environment inside Jupyter Notebooks:
 
 ```bash
-# Install dependencies directly
-uv pip install -e .
-
-# Run Python scripts
-uv run python src/de/extract/web_scraper/scraper.py
-
-# Run any command in the uv environment
-uv run pytest
+python -m ipykernel install --user --name traffy-dsde --display-name "Python (traffy-dsde)"
 ```
 
-## Dependencies
+## Usage (Automated Pipeline)
 
-The project includes the following core dependencies:
+The `submit_job.sh` script orchestrates the entire pipeline:
 
-- **pandas** (>=2.0.0): Data manipulation and analysis
-- **numpy** (>=1.24.0): Numerical computing
-- **requests** (>=2.31.0): HTTP library for web scraping
-- **pyspark** (>=3.5.0): Big data processing with Apache Spark
-- **scikit-learn** (>=1.3.0): Machine learning library
+1.  Creates necessary directories (`data/raw`, `data/processed`).
+2.  Downloads raw data.
+3.  Scrapes station metadata.
+4.  Runs the ETL process (using either Python or Spark).
 
-## Example Usage
+### Run with Python Engine (Default)
 
-### Web Scraper
+Best for local development or small datasets.
 
 ```bash
-# Run the web scraper example
-uv run python src/de/extract/web_scraper/scraper.py
+chmod +x submit_job.sh
+./submit_job.sh
 ```
 
-### Download Job (Skip if Exists)
+### Run with Spark Engine
+
+Best for processing large historical datasets.
 
 ```bash
-# Run the download job
-uv run python pipelines/jobs/download_job.py
+./submit_job.sh spark
 ```
 
-### Spark ETL Job
+-----
+
+## Manual Execution (For Developers)
+
+If you need to run specific parts of the pipeline individually for debugging:
+
+**1. Download Raw Data**
 
 ```bash
-# Run the Spark ETL example
-uv run python src/de/spark_jobs/etl_example.py
+python -m jobs.download_raw_data
+```
+
+**2. Scrape Metadata**
+
+```bash
+python -m jobs.station_name_scraping
+```
+
+**3. Run ETL Driver Manually**
+
+```bash
+# Run with Python pandas
+python etl_driver.py --engine python
+
+# Run with PySpark
+python etl_driver.py --engine spark
 ```
 
 ## Development
@@ -125,32 +130,16 @@ uv run python src/de/spark_jobs/etl_example.py
 ### Running Tests
 
 ```bash
-# Install dev dependencies first
-uv pip install -e ".[dev]"
-
-# Run tests
-uv run pytest tests/
+pytest tests/
 ```
 
-### Code Formatting
+### Data Management
 
-```bash
-# Format code with black
-uv run black src/ tests/
-
-# Lint with ruff
-uv run ruff check src/ tests/
-```
-
-## Data Management
-
-- Raw data should be placed in `data/raw/`
-- Processed data should be saved to `data/processed/`
-- Both directories are excluded from version control via `.gitignore`
-- Only `.gitkeep` files are tracked to preserve directory structure
+  * **Raw Data:** Placed in `data/raw/` (Git ignored)
+  * **Processed Data:** Saved to `data/processed/` (Git ignored)
+  * **Model Artifacts:** Saved to `data/model/`
 
 ## Notes
 
-- This project uses a `src/` layout for better package organization
-- `uv` provides faster dependency resolution compared to pip
-- PySpark jobs may require Java to be installed on your system
+  * **Spark:** This project uses PySpark. Ensure you have Java (JDK 8 or 11) installed if running Spark jobs locally.
+  * **Visualization:** The dashboard logic is separated into an external repository (linked above).
