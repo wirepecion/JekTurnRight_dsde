@@ -1,11 +1,15 @@
 # JekTurnRight_dsde
 
-**External Resources:**
-* **Visualization Dashboard:** [JekTurnRight_dsde_visualize](https://github.com/ahpu9158/JekTurnRight_dsde_visualize)
-* **HuggingFace Model:** [sirasira/flood-lstm-v1](https://huggingface.co/sirasira/flood-lstm-v1/tree/main)
-* **FASTAPI (HF Space):** [bangkok-flood-api](https://huggingface.co/spaces/sirasira/bangkok-flood-api/blob/main/app.py)
+A Data Science and Data Engineering repository using `uv` for package management with a `src/` layout.
 
----
+## Make Ikernel
+```bash
+uv venv .venv
+source .venv/bin/activate          # or .venv\Scripts\activate on Windows
+uv pip install -e .
+uv pip install ipykernel
+python -m ipykernel install --user --name traffy-dsde
+```
 
 ## Project Structure
 
@@ -141,5 +145,6 @@ pytest tests/
 
 ## Notes
 
-  * **Spark:** This project uses PySpark. Ensure you have Java (JDK 8 or 11) installed if running Spark jobs locally.
-  * **Visualization:** The dashboard logic is separated into an external repository (linked above).
+- This project uses a `src/` layout for better package organization
+- `uv` provides faster dependency resolution compared to pip
+- PySpark jobs may require Java to be installed on your system
