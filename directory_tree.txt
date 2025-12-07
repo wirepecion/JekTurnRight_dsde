@@ -1,0 +1,107 @@
+.
+├── README.md
+├── config
+│   └── log4j2.properties.py
+├── data
+│   ├── external
+│   │   ├── rainfall.csv
+│   │   └── station.csv
+│   ├── model
+│   │   ├── 2024_forecast.csv
+│   │   ├── best_model.pth
+│   │   ├── classification_report.txt
+│   │   ├── config.json
+│   │   ├── confusion_matrix.png
+│   │   ├── optuna_history.png
+│   │   ├── optuna_optimization_map.png
+│   │   ├── pytorch_model.bin
+│   │   ├── scaler.pkl
+│   │   ├── thresholds.json
+│   │   └── train_loss.txt
+│   ├── processed
+│   │   ├── clean_flood_data.csv
+│   │   ├── flood_training_data_csv
+│   │   │   ├── _SUCCESS
+│   │   │   └── part-00000-529dc99e-7fc0-4b37-a50e-5ec81d4f3e81-c000.csv
+│   │   ├── flood_training_data_spark
+│   │   │   ├── _SUCCESS
+│   │   │   ├── year_timestamp=2022
+│   │   │   ├── year_timestamp=2023
+│   │   │   └── year_timestamp=2024
+│   │   └── test_set.csv
+│   └── raw
+│       ├── BMA
+│       │   ├── BMA_ADMIN_SUB_DISTRICT.cpg
+│       │   ├── BMA_ADMIN_SUB_DISTRICT.dbf
+│       │   ├── BMA_ADMIN_SUB_DISTRICT.prj
+│       │   ├── BMA_ADMIN_SUB_DISTRICT.shp
+│       │   ├── BMA_ADMIN_SUB_DISTRICT.shp.xml
+│       │   └── BMA_ADMIN_SUB_DISTRICT.shx
+│       ├── bangkok_traffy.csv
+│       ├── bma_rain_station_js_array.txt
+│       ├── example.csv
+│       └── run.ipynb
+├── debug.log
+├── directory_tree.txt
+├── etl_driver.py
+├── init.sh
+├── jobs
+│   ├── download_raw_data.py
+│   ├── python_data_pipeline.py
+│   ├── scrape_water_levels.py
+│   └── station_name_scraping.py
+├── notebooks
+│   ├── LSTM_pipeline.ipynb
+│   ├── insight.ipynb
+│   └── merge_scraped_data.ipynb
+├── pyproject.toml
+├── requirements.txt
+├── scrapers
+│   ├── traffy
+│   │   └── download_traffy.py
+│   └── water_level
+│       ├── README.md
+│       ├── __init__.py
+│       ├── scraper.py
+│       ├── station_name_scraping.py
+│       └── water_level_scraper.py
+├── src
+│   ├── __init__.py
+│   ├── dataprep
+│   │   ├── __init__.py
+│   │   ├── cleaning.py
+│   │   ├── geo.py
+│   │   ├── io.py
+│   │   ├── mergers.py
+│   │   └── pipeline.py
+│   ├── de
+│   │   ├── __init__.py
+│   │   ├── settings.py
+│   │   ├── spark_jobs
+│   │   │   ├── __init__.py
+│   │   │   ├── cleaning.py
+│   │   │   ├── geo.py
+│   │   │   └── traffy_etl_job.py
+│   │   └── spark_session.py
+│   ├── ds
+│   │   ├── __init__.py
+│   │   ├── deploy.py
+│   │   ├── models.py
+│   │   ├── predict.py
+│   │   ├── train.py
+│   │   ├── tune_config.py
+│   │   ├── tune_thresholds.py
+│   │   ├── utils.py
+│   │   └── validate.py
+│   └── setting
+│       ├── __init__.py
+│       └── config.py
+├── submit_job.sh
+└── tests
+    ├── __init__.py
+    ├── test_common.py
+    ├── test_ds_loading.py
+    ├── test_pipeline_ml.py
+    └── test_spark_cleaning.py
+
+24 directories, 80 files
